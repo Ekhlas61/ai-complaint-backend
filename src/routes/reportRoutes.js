@@ -1,0 +1,27 @@
+const express = require('express');
+const router = express.Router();
+
+const protect = require('../middleware/authMiddleware');
+const authorizeRoles = require('../middleware/roleMiddleware');
+
+const {
+  createReport,
+  getReports,
+  getReportById,
+  updateReportStatus,
+} = require('../controllers/reportController');
+
+
+// 🔐 Create report (any logged-in user)
+router.post('/', protect, createReport);
+
+// 👑 Get all reports (Admins only)
+router.get('/', protect, authorizeRoles('DeptAdmin', 'SysAdmin'), getReports);
+
+// 🔍 Get single report
+router.get('/:id', protect, getReportById);
+
+// 🔄 Update status
+router.put('/:id/status', protect, authorizeRoles('DeptAdmin', 'SysAdmin'), updateReportStatus);
+
+module.exports = router;

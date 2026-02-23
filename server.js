@@ -3,6 +3,8 @@ const express = require('express');
 const connectDB = require('./src/config/db');
 
 const authRoutes = require('./src/routes/authRoutes');
+const reportRoutes = require('./src/routes/reportRoutes');
+
 
 
 const app = express();
@@ -15,6 +17,7 @@ connectDB();
 
 // Routes 
 app.use('/api/auth', authRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Test route
 app.get('/', (req, res) => {
