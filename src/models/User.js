@@ -4,6 +4,7 @@ const userSchema = new mongoose.Schema({
   employeeID: {
     type: String,
     unique: true,
+    sparse: true,
   },
   fullName: {
     type: String,

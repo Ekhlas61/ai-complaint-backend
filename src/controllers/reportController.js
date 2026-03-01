@@ -1,5 +1,5 @@
 const Report = require('../models/Report');
-
+const Assignment = require('../models/Assignment');
 
 // ✅ CREATE REPORT
 exports.createReport = async (req, res) => {
@@ -86,6 +86,32 @@ exports.updateReportStatus = async (req, res) => {
     const updatedReport = await report.save();
 
     res.json(updatedReport);
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+// ✅ ASSIGN REPORT
+exports.assignReport = async (req, res) => {
+  try {
+    const { assignedTo, note } = req.body;
+
+    const reportId = req.params.id;
+
+    const assignment = await Assignment.create({
+      report: reportId,
+      assignedTo,
+      assignedBy: req.user._id,
+      assignmentNote: note,
+    });
+
+    res.status(201).json({
+      message: 'Report assigned successfully',
+      assignment,
+    });
 
   } catch (error) {
     res.status(500).json({ message: error.message });

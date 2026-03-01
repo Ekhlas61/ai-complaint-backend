@@ -9,6 +9,8 @@ const {
   getReports,
   getReportById,
   updateReportStatus,
+  assignReport
+  
 } = require('../controllers/reportController');
 
 
@@ -23,5 +25,10 @@ router.get('/:id', protect, getReportById);
 
 // 🔄 Update status
 router.put('/:id/status', protect, authorizeRoles('DeptAdmin', 'SysAdmin'), updateReportStatus);
+
+
+// 👑 Assign report (Admins only)
+router.post('/:id/assign', protect, authorizeRoles('DeptAdmin', 'SysAdmin'), assignReport);
+
 
 module.exports = router;
