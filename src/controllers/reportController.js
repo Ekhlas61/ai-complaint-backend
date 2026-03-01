@@ -1,5 +1,6 @@
 const Report = require('../models/Report');
 const Assignment = require('../models/Assignment');
+const Comment = require('../models/Comment');
 
 // ✅ CREATE REPORT
 exports.createReport = async (req, res) => {
@@ -112,6 +113,42 @@ exports.assignReport = async (req, res) => {
       message: 'Report assigned successfully',
       assignment,
     });
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+
+
+// ✅ ADD COMMENT
+exports.addComment = async (req, res) => {
+  try {
+    const { commentText } = req.body;
+
+    const comment = await Comment.create({
+      report: req.params.id,
+      author: req.user._id,
+      commentText,
+    });
+
+    res.status(201).json(comment);
+
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+
+// ✅ GET COMMENTS FOR REPORT
+exports.getComments = async (req, res) => {
+  try {
+    const comments = await Comment.find({ report: req.params.id })
+      .populate('author', 'fullName email')
+      .sort({ createdAt: -1 });
+
+    res.json(comments);
 
   } catch (error) {
     res.status(500).json({ message: error.message });
