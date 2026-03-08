@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 
+const { getReportHistory } = require('../controllers/reportController');
+
 const protect = require('../middleware/authMiddleware');
 const authorizeRoles = require('../middleware/roleMiddleware');
 
@@ -38,6 +40,9 @@ router.post('/:id/comments', protect, addComment);
 
 // 📥 Get comments
 router.get('/:id/comments', protect, getComments);
+
+//  Get History
+router.get('/:id/history', protect, getReportHistory);
 
 
 
