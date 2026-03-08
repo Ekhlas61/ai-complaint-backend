@@ -6,8 +6,16 @@ const authRoutes = require('./src/routes/authRoutes');
 const reportRoutes = require('./src/routes/reportRoutes');
 
 
-
 const app = express();
+
+const swaggerUi = require("swagger-ui-express");
+const YAML = require("yamljs");
+
+const swaggerDocument = YAML.load("./src/docs/swagger.yaml");
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+
 
 // Middleware
 app.use(express.json());
