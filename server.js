@@ -15,6 +15,19 @@ const swaggerDocument = YAML.load("./src/docs/swagger.yaml");
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
+// Swagger 
+cd 
+if (process.env.NODE_ENV === "production") {
+  swaggerDocument.servers = [
+    {
+      url: "https://your-app-name.onrender.com/api",
+      description: "Production Server",
+    },
+  ];
+}
+
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 
 
 // Middleware

@@ -5,6 +5,10 @@ info:
   version: 1.0.0
 
 servers:
+  - url: https://ai-complaint-backend-7xc5.onrender.com/
+    description: Production Server (Render)
+
+
   - url: http://localhost:5000/api
     description: Local Development Server
 
