@@ -13,14 +13,13 @@ const YAML = require("yamljs");
 
 const swaggerDocument = YAML.load("./src/docs/swagger.yaml");
 
-app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
 
 // Swagger 
-cd 
 if (process.env.NODE_ENV === "production") {
   swaggerDocument.servers = [
     {
-      url: "https://your-app-name.onrender.com/api",
+      url: "https://ai-complaint-backend-7xc5.onrender.com/api",
       description: "Production Server",
     },
   ];
