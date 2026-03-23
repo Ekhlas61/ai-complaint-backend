@@ -1,12 +1,15 @@
 openapi: 3.0.0
 info:
   title: Smart Complaint Management System API
-  description: Backend API documentation for the Smart Complaint Management System
-  version: 1.0.0
-
+  description: |
+    Backend API for the Smart Complaint Management System.
+    
+  version: 2.0.0
 servers:
   - url: http://localhost:5000/api
     description: Local Development Server
+  - url: https://your-app.onrender.com/api
+    description: Production Server
 
 components:
   securitySchemes:
@@ -16,37 +19,181 @@ components:
       bearerFormat: JWT
 
   schemas:
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          example: "Invalid token"
+      required:
+        - message
 
     User:
       type: object
       properties:
         _id:
           type: string
-        fullname:
+          example: 67c4a8b9f2e3d4c5e6789012
+        fullName:
           type: string
+          example: Abebe Kebede
         email:
           type: string
+          example: abebe.kebede@example.com
         role:
           type: string
+          enum: [Citizen, DeptAdmin, OrgAdmin, SysAdmin]
           example: Citizen
+        organization:
+          type: string
+          nullable: true
+          enum: [EEP, AAWSA]
+          example: EEP
+        department:
+          type: string
+          nullable: true
+          example: 67c4a8b9f2e3d4c5e6789078
+        employeeID:
+          type: string
+          nullable: true
+          example: EMP123
+        createdAt:
+          type: string
+          format: date-time
+        lastLogin:
+          type: string
+          format: date-time
+          nullable: true
+        isActive:
+          type: boolean
+          example: true
 
-    Report:
+    Department:
       type: object
       properties:
         _id:
           type: string
-        title:
+        name:
           type: string
+          example: "EEP - Customer Service"
+        code:
+          type: string
+          example: "CS_EEP"
         description:
           type: string
+        head:
+          type: string
+          nullable: true
+          description: User ID of the DeptAdmin heading this department
+        isActive:
+          type: boolean
+          default: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Complaint:
+      type: object
+      properties:
+        _id:
+          type: string
+          example: 67d5b9c0a1f2e3d4c6789023
+        title:
+          type: string
+          example: "Pothole on Bole Road"
+        description:
+          type: string
+          example: "Large pothole causing traffic accidents"
         category:
           type: string
+          example: "Road Infrastructure"
         location:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [Point]
+              default: Point
+            coordinates:
+              type: array
+              items:
+                type: number
+              minItems: 2
+              maxItems: 2
+              description: [longitude, latitude]
+            locationName:
+              type: string
+        images:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              uploadedAt:
+                type: string
+                format: date-time
+        submittedBy:
           type: string
+          description: User ID of the citizen who submitted the complaint
+        department:
+          type: string
+          description: Department ID
+        assignedTo:
+          type: string
+          nullable: true
+          description: User ID of the DeptAdmin assigned to handle the complaint
         status:
           type: string
-          example: Submitted
+          enum: [Submitted, In Progress, Resolved, Rejected]
+          default: Submitted
+        priority:
+          type: string
+          enum: [Low, Medium, High, Critical]
+          default: Medium
+        history:
+          type: array
+          items:
+            type: object
+            properties:
+              action:
+                type: string
+              by:
+                type: string
+              comment:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+        syncStatus:
+          type: string
+          enum: [Pending, Synced, Failed]
+          default: Pending
+        attachments:
+          type: array
+          items:
+            type: object
+            properties:
+              filename:
+                type: string
+              path:
+                type: string
+              uploadedAt:
+                type: string
+                format: date-time
+        deviceInfo:
+          type: string
+        resolvedAt:
+          type: string
+          format: date-time
+          nullable: true
         createdAt:
+          type: string
+          format: date-time
+        updatedAt:
           type: string
           format: date-time
 
@@ -55,17 +202,59 @@ components:
       properties:
         _id:
           type: string
+        complaint:
+          type: string
+          description: Complaint ID
+        author:
+          type: string
+          description: User ID of the commenter
         commentText:
           type: string
         createdAt:
           type: string
           format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+  responses:
+    Unauthorized:
+      description: Unauthorized – invalid or missing token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Forbidden – insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequest:
+      description: Bad request - validation error or missing fields
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
 
 paths:
-
+  # ========== AUTHENTICATION ==========
   /auth/register:
     post:
-      summary: Register new user
+      summary: Register a new citizen user (self-registration)
+      description: Only citizens can self-register. Other roles must be registered by an upper admin.
       tags: [Authentication]
       requestBody:
         required: true
@@ -73,28 +262,44 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - fullname
-                - email
-                - password
-                - role
+              required: [fullName, email, password]
               properties:
-                fullname:
+                fullName:
                   type: string
+                  example: "Abebe Kebede"
                 email:
                   type: string
+                  format: email
+                  example: "abebe.kebede@example.com"
                 password:
                   type: string
-                role:
-                  type: string
-                  example: Citizen
+                  minLength: 8
+                  example: "securepassword123"
       responses:
-        201:
+        '201':
           description: User registered successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                  fullName:
+                    type: string
+                  email:
+                    type: string
+                  token:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
   /auth/login:
     post:
-      summary: Login user
+      summary: Authenticate user and get JWT
+      description: Login is available for all user roles.
       tags: [Authentication]
       requestBody:
         required: true
@@ -102,22 +307,143 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - email
-                - password
+              required: [email, password]
               properties:
                 email:
                   type: string
+                  format: email
+                  example: "abebe.kebede@example.com"
                 password:
                   type: string
+                  example: "securepassword123"
       responses:
-        200:
+        '200':
           description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Login successful"
+                  _id:
+                    type: string
+                  role:
+                    type: string
+                    enum: [Citizen, DeptAdmin, OrgAdmin, SysAdmin]
+                  token:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Account deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
-  /reports:
+  /auth/forgot-password:
     post:
-      summary: Create a new complaint report
-      tags: [Reports]
+      summary: Request password reset
+      description: Send a password reset link to the user's email.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "abebe.kebede@example.com"
+      responses:
+        '200':
+          description: Reset link sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "A reset link has been sent."
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/reset-password:
+    post:
+      summary: Reset password with token
+      description: Set a new password using the reset token.
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, email, password]
+              properties:
+                token:
+                  type: string
+                  example: "abc123def456"
+                email:
+                  type: string
+                  format: email
+                  example: "abebe.kebede@example.com"
+                password:
+                  type: string
+                  minLength: 8
+                  example: "newsecurepassword123"
+      responses:
+        '200':
+          description: Password reset successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Password reset successful. Please login."
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/profile:
+    get:
+      summary: Get current user's profile
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /auth/change-password:
+    post:
+      summary: Change password (requires current password)
+      tags: [Authentication]
       security:
         - bearerAuth: []
       requestBody:
@@ -126,37 +452,439 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - title
-                - description
-                - category
-                - location
+              required: [oldPassword, newPassword]
               properties:
-                title:
+                oldPassword:
+                  type: string
+                  example: "currentPassword123"
+                newPassword:
+                  type: string
+                  minLength: 8
+                  example: "newSecurePassword456"
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Password changed successfully. Please log in again with the new password."
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ========== USER MANAGEMENT ==========
+  /users/org-admins:
+    post:
+      summary: Create a new Organization Admin (SysAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, email, password, organization]
+              properties:
+                fullName:
+                  type: string
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  example: "orgadmin@eep.com.et"
+                password:
+                  type: string
+                  minLength: 8
+                  example: "securepassword123"
+                organization:
+                  type: string
+                  enum: [EEP, AAWSA]
+                  example: "EEP"
+      responses:
+        '201':
+          description: OrgAdmin created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                  fullName:
+                    type: string
+                  email:
+                    type: string
+                  role:
+                    type: string
+                  organization:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /users/dept-admins:
+    post:
+      summary: Create a new Department Admin (OrgAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, email, password, departmentId]
+              properties:
+                fullName:
+                  type: string
+                  example: "Jane Smith"
+                email:
+                  type: string
+                  format: email
+                  example: "deptadmin@eep.com.et"
+                password:
+                  type: string
+                  minLength: 8
+                  example: "securepassword123"
+                departmentId:
+                  type: string
+                  description: ObjectId of the department the admin will manage
+                  example: "67c4a8b9f2e3d4c5e6789078"
+      responses:
+        '201':
+          description: DeptAdmin created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  _id:
+                    type: string
+                  fullName:
+                    type: string
+                  email:
+                    type: string
+                  role:
+                    type: string
+                  department:
+                    type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /users:
+    get:
+      summary: List users (SysAdmin sees all, OrgAdmin sees their own DeptAdmins & Citizens)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ========== DEPARTMENTS ==========
+  /departments:
+    post:
+      summary: Create new department (OrgAdmin only)
+      tags: [Departments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code]
+              properties:
+                name:
+                  type: string
+                  example: "EEP - Customer Service"
+                code:
+                  type: string
+                  example: "CS_EEP"
+                description:
+                  type: string
+                  example: "Handles billing, outages, meter issues, and general complaints."
+                head:
+                  type: string
+                  description: User ID of the DeptAdmin (optional)
+      responses:
+        '201':
+          description: Department created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    get:
+      summary: List all active departments (OrgAdmin only)
+      tags: [Departments]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of departments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /departments/{id}:
+    put:
+      summary: Update department (OrgAdmin only)
+      tags: [Departments]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                code:
                   type: string
                 description:
                   type: string
+                head:
+                  type: string
+      responses:
+        '200':
+          description: Department updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /departments/{id}/deactivate:
+    put:
+      summary: Deactivate department (OrgAdmin only)
+      tags: [Departments]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Department deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Department deactivated successfully"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ========== COMPLAINTS ==========
+  /complaints:
+    post:
+      summary: Submit a new complaint (Citizen only)
+      tags: [Complaints]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, category, department]
+              properties:
+                title:
+                  type: string
+                  example: "Pothole on Bole Road"
+                description:
+                  type: string
+                  example: "Large pothole causing traffic accidents"
                 category:
                   type: string
+                  example: "Road Infrastructure"
                 location:
+                  type: object
+                  properties:
+                    coordinates:
+                      type: array
+                      items:
+                        type: number
+                      minItems: 2
+                      maxItems: 2
+                      example: [38.7636, 9.0250]
+                    locationName:
+                      type: string
+                      example: "Bole Road, Addis Ababa"
+                priority:
                   type: string
+                  enum: [Low, Medium, High, Critical]
+                  default: Medium
+                department:
+                  type: string
+                  description: Department ID where the complaint should be routed
+                  example: "67c4a8b9f2e3d4c5e6789078"
       responses:
-        201:
-          description: Report created successfully
+        '201':
+          description: Complaint submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Complaint'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
+  /complaints/my-complaints:
     get:
-      summary: Get all reports
-      tags: [Reports]
+      summary: Get complaints submitted by the logged-in citizen
+      tags: [Complaints]
       security:
         - bearerAuth: []
       responses:
-        200:
-          description: List of reports
+        '200':
+          description: List of complaints submitted by the user
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Complaint'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
-  /reports/{id}/assign:
-    post:
-      summary: Assign report to employee
-      tags: [Reports]
+  /complaints/assigned:
+    get:
+      summary: Get complaints assigned to the logged-in DeptAdmin (with summary stats)
+      tags: [Complaints]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Submitted, In Progress, Resolved, Rejected]
+          description: Filter by status
+      responses:
+        '200':
+          description: Assigned complaints with summary stats
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  summary:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      resolved:
+                        type: integer
+                      pending:
+                        type: integer
+                      resolvedPercentage:
+                        type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Complaint'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /complaints/{id}/status:
+    put:
+      summary: Update complaint status and/or add comment (DeptAdmin only)
+      tags: [Complaints]
       security:
         - bearerAuth: []
       parameters:
@@ -171,48 +899,119 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - assignedTo
-              properties:
-                assignedTo:
-                  type: string
-                assignmentNote:
-                  type: string
-      responses:
-        200:
-          description: Report assigned successfully
-
-  /reports/{id}/status:
-    patch:
-      summary: Update report status
-      tags: [Reports]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required:
-                - status
               properties:
                 status:
                   type: string
-                  example: In Progress
+                  enum: [Submitted, In Progress, Resolved, Rejected]
+                  example: "In Progress"
+                comment:
+                  type: string
+                  example: "Crew dispatched to fix the pothole."
       responses:
-        200:
-          description: Status updated successfully
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  complaint:
+                    $ref: '#/components/schemas/Complaint'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
-  /reports/{id}/comments:
+  /complaints/{id}/assign:
+    put:
+      summary: Assign complaint to a department or specific DeptAdmin (OrgAdmin/SysAdmin only)
+      tags: [Complaints]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assignedTo:
+                  type: string
+                  description: User ID of the DeptAdmin (optional)
+                department:
+                  type: string
+                  description: Department ID (optional, but at least one required)
+                note:
+                  type: string
+                  description: Assignment note
+      responses:
+        '200':
+          description: Complaint assigned
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  complaint:
+                    $ref: '#/components/schemas/Complaint'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /complaints/{id}:
+    get:
+      summary: Get a single complaint by ID (role‑based access)
+      tags: [Complaints]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Complaint details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Complaint'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /complaints/{id}/comments:
     post:
-      summary: Add comment to report
+      summary: Add a comment to a complaint (authorized users only)
       tags: [Comments]
       security:
         - bearerAuth: []
@@ -228,17 +1027,30 @@ paths:
           application/json:
             schema:
               type: object
-              required:
-                - commentText
+              required: [commentText]
               properties:
                 commentText:
                   type: string
+                  example: "Will update by tomorrow."
       responses:
-        201:
-          description: Comment added successfully
-
+        '201':
+          description: Comment added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
     get:
-      summary: Get report comments
+      summary: Get all comments for a complaint (authorized users only)
       tags: [Comments]
       security:
         - bearerAuth: []
@@ -249,21 +1061,19 @@ paths:
           schema:
             type: string
       responses:
-        200:
+        '200':
           description: List of comments
-
-  /reports/{id}/history:
-    get:
-      summary: Get report history
-      tags: [Reports]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        200:
-          description: Report history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Comment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
