@@ -14,7 +14,7 @@ const generateToken = (id) => {
 // 📝 Register User
 exports.registerUser = async (req, res) => {
   try {
-    const { fullName, email, password, role } = req.body;
+    const { fullName, email, password } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ email });
@@ -26,12 +26,12 @@ exports.registerUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Create user
+    // Create user (force role to "Citizen", ignore any provided role)
     const user = await User.create({
       fullName,
       email,
       passwordHash,
-      role,
+      role: 'Citizen',
     });
 
     res.status(201).json({

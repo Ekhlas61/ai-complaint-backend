@@ -78,12 +78,12 @@ paths:
             schema:
               type: object
               required:
-                - fullname
+                - fullName
                 - email
                 - password
                 - role
               properties:
-                fullname:
+                fullName:
                   type: string
                 email:
                   type: string
