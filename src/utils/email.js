@@ -1,25 +1,60 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async ({ to, subject, html }) => {
-  // Use environment variables for real SMTP (Gmail, SendGrid, etc.)
-  const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp.mailtrap.io', // ← change to real
-    port: process.env.EMAIL_PORT || 2525,
-    secure: false,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  // If SMTP credentials are provided, use them. Otherwise create an Ethereal test account
+  let transporter;
+  let usingTestAccount = false;
+
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+    transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || 'smtp.ethereal.email',
+      port: process.env.EMAIL_PORT || 587,
+      secure: process.env.EMAIL_PORT === 465, // true for port 465, false for others
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  } else {
+    // Create a disposable Ethereal account for testing when real SMTP is not configured
+    try {
+      const testAccount = await nodemailer.createTestAccount();
+      transporter = nodemailer.createTransport({
+        host: 'smtp.ethereal.email',
+        port: 587,
+        secure: false,
+        auth: {
+          user: testAccount.user,
+          pass: testAccount.pass,
+        },
+      });
+      usingTestAccount = true;
+    } catch (err) {
+      return { error: `Failed to create test SMTP account: ${err.message}`, stack: err.stack };
+    }
+  }
 
   const mailOptions = {
-    from: `"Complaint System" <${process.env.EMAIL_FROM || 'no-reply@yourapp.com'}>`,
+    from: `${process.env.EMAIL_FROM || '"Complaint System" <no-reply@yourapp.com>'}`,
     to,
     subject,
     html,
   };
 
-  await transporter.sendMail(mailOptions);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+
+    // If using Ethereal (either test account or provided credentials), return the preview URL
+    if (usingTestAccount || process.env.EMAIL_HOST?.includes('ethereal.email')) {
+      const previewUrl = nodemailer.getTestMessageUrl(info);
+      return { info, previewUrl };
+    }
+
+    return { info };
+  } catch (err) {
+    // Return error details to caller so higher-level handlers can decide how to respond
+    return { error: err.message, stack: err.stack };
+  }
 };
 
 module.exports = sendEmail;

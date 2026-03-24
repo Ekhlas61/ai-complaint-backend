@@ -10,6 +10,7 @@ const authRoutes = require('./src/routes/authRoutes');
 const complaintRoutes = require('./src/routes/complaintRoutes');
 const departmentRoutes = require('./src/routes/departmentRoutes');
 const userRoutes = require('./src/routes/userRoutes');
+const debugRoutes = require('./src/routes/debugRoutes');
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/debug', debugRoutes);
 
 // Test route
 app.get('/', (req, res) => {
