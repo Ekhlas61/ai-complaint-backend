@@ -1,12 +1,55 @@
-const authorizeRoles = (...roles) => {
+
+const authorizeRoles = (...allowedRoles) => {
   return (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
+    if (!req.user) {
+      return res.status(401).json({ message: 'Not authenticated' });
+    }
+    if (!allowedRoles.includes(req.user.role)) {
       return res.status(403).json({
-        message: `Access denied. Role (${req.user.role}) not allowed`,
+        message: `Access denied. Required roles: ${allowedRoles.join(', ')}. Your role: ${req.user.role}`,
       });
     }
     next();
   };
 };
 
-module.exports = authorizeRoles;
+// Specific role middleware for convenience
+const isCitizen = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+  if (req.user.role !== 'Citizen') {
+    return res.status(403).json({ message: 'Access denied. Citizen role required.' });
+  }
+  next();
+};
+
+const isDeptAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+  if (req.user.role !== 'DeptAdmin') {
+    return res.status(403).json({ message: 'Access denied. DeptAdmin role required.' });
+  }
+  next();
+};
+
+const isOrgAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+  if (req.user.role !== 'OrgAdmin') {
+    return res.status(403).json({ message: 'Access denied. OrgAdmin role required.' });
+  }
+  next();
+};
+
+const isSysAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+  if (req.user.role !== 'SysAdmin') {
+    return res.status(403).json({ message: 'Access denied. SysAdmin role required.' });
+  }
+  next();
+};
+
+module.exports = {
+  authorizeRoles,
+  isCitizen,
+  isDeptAdmin,
+  isOrgAdmin,
+  isSysAdmin,
+};
