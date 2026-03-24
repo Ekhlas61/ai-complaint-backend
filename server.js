@@ -16,6 +16,19 @@ const app = express();
 
 // Load Swagger document
 const swaggerDocument = YAML.load("./src/docs/swagger.yaml");
+
+
+
+// Swagger 
+if (process.env.NODE_ENV === "production") {
+  swaggerDocument.servers = [
+    {
+      url: "https://ai-complaint-backend-7xc5.onrender.com/api",
+      description: "Production Server",
+    },
+  ];
+}
+
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 // CORS middleware – place after app creation, before other middleware
