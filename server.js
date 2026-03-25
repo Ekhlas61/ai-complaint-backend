@@ -74,7 +74,8 @@ app.set('io', io);
 // CORS configuration – allow local Swagger UI and frontend during development
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
-  'http://localhost:5000',               
+  'http://localhost:5000',     
+  'https://ai-complaint-backend-7xc5.onrender.com',           
 ];
 
 app.use(cors({
