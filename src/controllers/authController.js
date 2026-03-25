@@ -60,7 +60,6 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-
 // 🔐 Login User
 exports.loginUser = async (req, res) => {
   try {
@@ -80,6 +79,10 @@ exports.loginUser = async (req, res) => {
       return res.status(403).json({ message: 'Account is deactivated' });
     }
 
+    
+    user.lastLogin = new Date();
+    await user.save();
+
     const token = generateToken(user);
 
     return res.json({
@@ -94,7 +97,7 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-// Forgot Password - Request reset
+// Forgot Password - Request reset 
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -114,7 +117,7 @@ exports.forgotPassword = async (req, res) => {
     // Generate token
     const resetToken = crypto.randomBytes(32).toString('hex');
 
-    // Log the token for testing (remove in production)
+    // Log the token for testing 
     console.log(`RESET TOKEN FOR ${email}: ${resetToken}`);
 
     user.resetPasswordToken = crypto
@@ -182,7 +185,7 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-// Reset Password - Set new password
+// Reset Password - Set new password 
 exports.resetPassword = async (req, res) => {
   try {
     const { token, email, password } = req.body;
@@ -241,7 +244,6 @@ exports.getProfile = async (req, res) => {
       fullName: user.fullName,
       email: user.email,
       role: user.role,
-      employeeID: user.employeeID || null, // only for non-citizen roles
       createdAt: user.createdAt,
       lastLogin: user.lastLogin || null,
       isActive: user.isActive,
@@ -252,8 +254,7 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-
-// Change password (requires current password)
+// Change password (unchanged)
 exports.changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;

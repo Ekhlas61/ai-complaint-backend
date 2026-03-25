@@ -2,12 +2,7 @@ const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema(
   {
-    employeeID: {
-      type: String,
-      unique: true,
-      sparse: true, // only for DeptAdmin / OrgAdmin / SysAdmin
-    },
-
+   
     fullName: {
       type: String,
       required: [true, 'Full name is required'],
@@ -71,8 +66,10 @@ const userSchema = new mongoose.Schema(
         default: null,
     },
 
-    lastLogin: Date,
-
+    lastLogin: {
+      type: Date,
+      default: null,
+    },
     
   },
   {
@@ -80,14 +77,6 @@ const userSchema = new mongoose.Schema(
   }
 );
 
-
-// Prevent Citizen from having employeeID
-userSchema.pre('save', async function () {
-  if (this.role === 'Citizen') {
-    this.employeeID = undefined;
-  }
- 
-});
 
 // Indexes
 

@@ -1,6 +1,7 @@
 const Complaint = require('../models/Complaint');
 const Department = require('../models/Department');
 const User = require('../models/User');
+const Organization = require('../models/Organization');
 
 // Helper: get counts and percentage for a query filter
 const getStats = async (filter) => {
@@ -24,12 +25,15 @@ exports.getDeptAdminStats = async (req, res) => {
 // ========== ORGADMIN ==========
 exports.getOrgAdminStats = async (req, res) => {
   try {
-    const organization = req.user.organization; 
+    const orgId = req.user.organization;
+    if (!orgId) {
+      return res.status(403).json({ message: 'Your account is not associated with an organization' });
+    }
 
-    // Departments in this organization 
+    // Find all departments belonging to this organization
     const departments = await Department.find({
-      name: { $regex: `^${organization} - `, $options: 'i' },
-      isActive: true
+      organization: orgId,
+      isActive: true,
     }).select('_id name');
 
     const deptStats = await Promise.all(departments.map(async (dept) => {
@@ -37,19 +41,7 @@ exports.getOrgAdminStats = async (req, res) => {
       return { departmentId: dept._id, name: dept.name, ...stats };
     }));
 
-    // DeptAdmins of this organization
-    const deptAdmins = await User.find({
-      role: 'DeptAdmin',
-      organization: organization,
-      isActive: true
-    }).select('_id fullName');
-
-    const adminStats = await Promise.all(deptAdmins.map(async (admin) => {
-      const stats = await getStats({ assignedTo: admin._id });
-      return { deptAdminId: admin._id, fullName: admin.fullName, ...stats };
-    }));
-
-    res.json({ departments: deptStats, deptAdmins: adminStats });
+    res.json({ departments: deptStats });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -58,39 +50,32 @@ exports.getOrgAdminStats = async (req, res) => {
 // ========== SYSADMIN ==========
 exports.getSysAdminStats = async (req, res) => {
   try {
-    const organizations = ['EEP', 'AAWSA'];
+    // Get all active organizations
+    const organizations = await Organization.find({ isActive: true }).select('_id name');
 
-    // Per organization
+    // Per organization stats
     const orgStats = await Promise.all(organizations.map(async (org) => {
       // All departments belonging to this organization
       const depts = await Department.find({
-        name: { $regex: `^${org} - `, $options: 'i' },
-        isActive: true
+        organization: org._id,
+        isActive: true,
       }).select('_id');
       const deptIds = depts.map(d => d._id);
       const stats = await getStats({ department: { $in: deptIds } });
-      return { organization: org, ...stats };
+      return { organizationId: org._id, name: org.name, ...stats };
     }));
 
-    // Per OrgAdmin
-    const orgAdmins = await User.find({ role: 'OrgAdmin', isActive: true })
-      .select('_id fullName organization');
-    const adminStats = await Promise.all(orgAdmins.map(async (admin) => {
-      const depts = await Department.find({
-        name: { $regex: `^${admin.organization} - `, $options: 'i' },
-        isActive: true
-      }).select('_id');
-      const deptIds = depts.map(d => d._id);
-      const stats = await getStats({ department: { $in: deptIds } });
-      return {
-        orgAdminId: admin._id,
-        fullName: admin.fullName,
-        organization: admin.organization,
-        ...stats
-      };
-    }));
+    res.json({ organizations: orgStats });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
 
-    res.json({ organizations: orgStats, orgAdmins: adminStats });
+// ========== CITIZEN ==========
+exports.getCitizenStats = async (req, res) => {
+  try {
+    const stats = await getStats({ submittedBy: req.user._id });
+    res.json(stats);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

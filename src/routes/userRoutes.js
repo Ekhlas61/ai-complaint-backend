@@ -4,13 +4,13 @@ const protect = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 const {
   createOrgAdmin,
-  createDeptAdmin,
+  getOrgAdmins,
   updateOrgAdmin,
   deactivateOrgAdmin,
-  getOrgAdmins,
+  createDeptAdmin,
+  getDeptAdmins,
   updateDeptAdmin,
   deactivateDeptAdmin,
-  getDeptAdmins,
 } = require('../controllers/userController');
 
 // ========== SysAdmin routes (OrgAdmin management) ==========
@@ -24,7 +24,5 @@ router.post('/dept-admins', protect, authorizeRoles('OrgAdmin'), createDeptAdmin
 router.get('/dept-admins', protect, authorizeRoles('OrgAdmin'), getDeptAdmins);
 router.put('/dept-admins/:id', protect, authorizeRoles('OrgAdmin'), updateDeptAdmin);
 router.put('/dept-admins/:id/deactivate', protect, authorizeRoles('OrgAdmin'), deactivateDeptAdmin);
-
-
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const Department = require('../models/Department');
 const AuditLog = require('../models/AuditLog');
+const mongoose = require('mongoose');
 
 // ────────────────────────────────────────────────
 // OrgAdmin: Create department
@@ -18,6 +19,19 @@ exports.createDepartment = async (req, res) => {
       return res.status(403).json({ message: 'Your account is not associated with an organization' });
     }
 
+    if (head) {
+  if (!mongoose.Types.ObjectId.isValid(head)) {
+    return res.status(400).json({ message: 'Invalid head ID. Must be a valid DeptAdmin ID.' });
+  }
+  const headUser = await User.findById(head);
+  if (!headUser || headUser.role !== 'DeptAdmin') {
+    return res.status(400).json({ message: 'Head must be a valid DeptAdmin user.' });
+  }
+  if (headUser.organization.toString() !== req.user.organization.toString()) {
+    return res.status(403).json({ message: 'Head must belong to your organization.' });
+  }
+}
+
     const existing = await Department.findOne({ $or: [{ name }, { code }] });
     if (existing) {
       return res.status(400).json({ message: 'Name or code already in use' });
@@ -28,7 +42,7 @@ exports.createDepartment = async (req, res) => {
       code: code.toUpperCase().trim(),
       description,
       head: head || null,
-      organization: req.user.organization,   // link to the OrgAdmin's organization
+      organization: req.user.organization,   
     });
 
     // Audit log

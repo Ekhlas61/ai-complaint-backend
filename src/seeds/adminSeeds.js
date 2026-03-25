@@ -32,9 +32,12 @@ const seedAdmins = async () => {
       { name: 'AAWSA', code: 'AAWSA', isActive: true },
       { upsert: true, returnDocument: 'after' }
     );
-    console.log('Organizations seeded');
+    console.log('Organizations seeded:', {
+      eep: { id: eepOrg._id, name: eepOrg.name },
+      aawsa: { id: aawsaOrg._id, name: aawsaOrg.name },
+    });
 
-    // SysAdmin (no organization)
+    // SysAdmin
     await User.findOneAndUpdate(
       { email: 'sysadmin@complaint.gov' },
       {
@@ -50,7 +53,7 @@ const seedAdmins = async () => {
     console.log('SysAdmin seeded');
 
     // OrgAdmins
-    await User.findOneAndUpdate(
+    const eepOrgAdmin = await User.findOneAndUpdate(
       { email: 'admin@eep.com.et' },
       {
         fullName: 'EEP Organization Admin',
@@ -63,7 +66,7 @@ const seedAdmins = async () => {
       },
       { upsert: true, returnDocument: 'after' }
     );
-    await User.findOneAndUpdate(
+    const aawsaOrgAdmin = await User.findOneAndUpdate(
       { email: 'admin@aawsa.gov.et' },
       {
         fullName: 'AAWSA Organization Admin',
@@ -76,7 +79,10 @@ const seedAdmins = async () => {
       },
       { upsert: true, returnDocument: 'after' }
     );
-    console.log('OrgAdmins seeded');
+    console.log('OrgAdmins seeded:', {
+      eep: { id: eepOrgAdmin._id, email: eepOrgAdmin.email, orgId: eepOrgAdmin.organization },
+      aawsa: { id: aawsaOrgAdmin._id, email: aawsaOrgAdmin.email, orgId: aawsaOrgAdmin.organization },
+    });
 
     // Departments
     const departmentsData = [
@@ -111,7 +117,7 @@ const seedAdmins = async () => {
         { upsert: true, returnDocument: 'after' }
       );
       departments[deptData.code] = department;
-      console.log(`Department seeded: ${department.name}`);
+      console.log(`Department seeded: ${department.name} (ID: ${department._id}), org: ${department.organization}`);
     }
 
     // DeptAdmins
@@ -154,11 +160,20 @@ const seedAdmins = async () => {
         deptAdmin,
         { upsert: true, returnDocument: 'after' }
       );
-      // Set the department head to this DeptAdmin (overwrite if already set)
+      console.log(`DeptAdmin created: ${user.email} (ID: ${user._id})`);
+      console.log(`  ↳ Organization: ${user.organization}`);
+      console.log(`  ↳ Department: ${user.department}`);
+
       if (deptAdmin.department) {
-        await Department.findByIdAndUpdate(deptAdmin.department, { head: user._id });
+        const updatedDept = await Department.findByIdAndUpdate(
+          deptAdmin.department,
+          { head: user._id },
+          { new: true, returnDocument: 'after' }
+        );
+        console.log(`  ↳ Set head of department ${updatedDept.name} to ${user.fullName}`);
+      } else {
+        console.error(`  ✗ No department ID for ${user.email}`);
       }
-      console.log(`DeptAdmin seeded: ${user.email}`);
     }
 
     console.log('Seeding completed.');

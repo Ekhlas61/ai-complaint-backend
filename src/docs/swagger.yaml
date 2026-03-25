@@ -60,10 +60,6 @@ components:
             name:
               type: string
           nullable: true
-        employeeID:
-          type: string
-          nullable: true
-          example: EMP123
         createdAt:
           type: string
           format: date-time
@@ -112,7 +108,7 @@ components:
         head:
           type: string
           nullable: true
-          description: User ID of the DeptAdmin heading this department
+          description: ObjectId of the DeptAdmin heading this department
         organization:
           type: object
           properties:
@@ -321,23 +317,6 @@ components:
                 type: integer
               resolvedPercentage:
                 type: integer
-        deptAdmins:
-          type: array
-          items:
-            type: object
-            properties:
-              deptAdminId:
-                type: string
-              fullName:
-                type: string
-              total:
-                type: integer
-              resolved:
-                type: integer
-              pending:
-                type: integer
-              resolvedPercentage:
-                type: integer
 
     SysAdminAnalytics:
       type: object
@@ -347,26 +326,9 @@ components:
           items:
             type: object
             properties:
-              organization:
+              organizationId:
                 type: string
-              total:
-                type: integer
-              resolved:
-                type: integer
-              pending:
-                type: integer
-              resolvedPercentage:
-                type: integer
-        orgAdmins:
-          type: array
-          items:
-            type: object
-            properties:
-              orgAdminId:
-                type: string
-              fullName:
-                type: string
-              organization:
+              name:
                 type: string
               total:
                 type: integer
@@ -683,8 +645,6 @@ paths:
                   type: string
                 email:
                   type: string
-                employeeID:
-                  type: string
       responses:
         '200':
           description: OrgAdmin updated
@@ -828,8 +788,6 @@ paths:
                   type: string
                 email:
                   type: string
-                employeeID:
-                  type: string
                 departmentId:
                   type: string
       responses:
@@ -880,8 +838,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/ServerError'
-
-  
 
   # ========== ORGANIZATIONS ==========
   /organizations:
@@ -1034,6 +990,7 @@ paths:
                   type: string
                 head:
                   type: string
+                  description: ObjectId of the DeptAdmin (optional)
       responses:
         '201':
           description: Department created
@@ -1509,7 +1466,7 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: OrgAdmin analytics (departments and DeptAdmins)
+          description: OrgAdmin analytics (departments)
           content:
             application/json:
               schema:
@@ -1529,11 +1486,31 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: SysAdmin analytics (organizations and OrgAdmins)
+          description: SysAdmin analytics (organizations)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SysAdminAnalytics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /analytics/citizen:
+    get:
+      summary: Get dashboard statistics for the logged-in citizen
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Citizen analytics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsSummary'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
