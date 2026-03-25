@@ -51,10 +51,10 @@ const userSchema = new mongoose.Schema(
     },
 
     organization: {
-    type: String,
-    enum: ['EEP', 'AAWSA'],
-    default: null,
-  },
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      default: null,
+    },
 
    department: {
     type: mongoose.Schema.Types.ObjectId,
@@ -88,5 +88,10 @@ userSchema.pre('save', async function () {
   }
  
 });
+
+// Indexes
+
+userSchema.index({ role: 1 });
+userSchema.index({ organization: 1 });
 
 module.exports = mongoose.model('User', userSchema);

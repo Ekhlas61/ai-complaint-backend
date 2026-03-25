@@ -3,17 +3,13 @@ info:
   title: Smart Complaint Management System API
   description: |
     Backend API for the Smart Complaint Management System.
-    
+    Supports citizen self-registration, complaint submission, assignment, status updates, comments, user management, and analytics.
   version: 2.0.0
 servers:
-  - url: https://ai-complaint-backend-7xc5.onrender.com/
+  - url: https://ai-complaint-backend-7xc5.onrender.com/api
     description: Production Server (Render)
-
-
   - url: http://localhost:5000/api
     description: Local Development Server
-  - url: https://your-app.onrender.com/api
-    description: Production Server
 
 components:
   securitySchemes:
@@ -49,14 +45,21 @@ components:
           enum: [Citizen, DeptAdmin, OrgAdmin, SysAdmin]
           example: Citizen
         organization:
-          type: string
+          type: object
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
           nullable: true
-          enum: [EEP, AAWSA]
-          example: EEP
         department:
-          type: string
+          type: object
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
           nullable: true
-          example: 67c4a8b9f2e3d4c5e6789078
         employeeID:
           type: string
           nullable: true
@@ -71,6 +74,27 @@ components:
         isActive:
           type: boolean
           example: true
+
+    Organization:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+          example: "EEP"
+        code:
+          type: string
+          example: "EEP"
+        isActive:
+          type: boolean
+          default: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     Department:
       type: object
@@ -89,6 +113,13 @@ components:
           type: string
           nullable: true
           description: User ID of the DeptAdmin heading this department
+        organization:
+          type: object
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
         isActive:
           type: boolean
           default: true
@@ -104,7 +135,6 @@ components:
       properties:
         _id:
           type: string
-          example: 67d5b9c0a1f2e3d4c6789023
         title:
           type: string
           example: "Pothole on Bole Road"
@@ -141,15 +171,33 @@ components:
                 type: string
                 format: date-time
         submittedBy:
-          type: string
-          description: User ID of the citizen who submitted the complaint
+          type: object
+          properties:
+            _id:
+              type: string
+            fullName:
+              type: string
+            email:
+              type: string
         department:
-          type: string
-          description: Department ID
+          type: object
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
+            code:
+              type: string
         assignedTo:
-          type: string
+          type: object
+          properties:
+            _id:
+              type: string
+            fullName:
+              type: string
+            email:
+              type: string
           nullable: true
-          description: User ID of the DeptAdmin assigned to handle the complaint
         status:
           type: string
           enum: [Submitted, In Progress, Resolved, Rejected]
@@ -166,30 +214,17 @@ components:
               action:
                 type: string
               by:
-                type: string
+                type: object
+                properties:
+                  _id:
+                    type: string
+                  fullName:
+                    type: string
               comment:
                 type: string
               timestamp:
                 type: string
                 format: date-time
-        syncStatus:
-          type: string
-          enum: [Pending, Synced, Failed]
-          default: Pending
-        attachments:
-          type: array
-          items:
-            type: object
-            properties:
-              filename:
-                type: string
-              path:
-                type: string
-              uploadedAt:
-                type: string
-                format: date-time
-        deviceInfo:
-          type: string
         resolvedAt:
           type: string
           format: date-time
@@ -210,8 +245,14 @@ components:
           type: string
           description: Complaint ID
         author:
-          type: string
-          description: User ID of the commenter
+          type: object
+          properties:
+            _id:
+              type: string
+            fullName:
+              type: string
+            email:
+              type: string
         commentText:
           type: string
         createdAt:
@@ -220,6 +261,121 @@ components:
         updatedAt:
           type: string
           format: date-time
+
+    Notification:
+      type: object
+      properties:
+        _id:
+          type: string
+        user:
+          type: string
+          description: User ID of the recipient
+        type:
+          type: string
+          enum: [COMPLAINT_ASSIGNED, STATUS_UPDATED, COMMENT_ADDED]
+        title:
+          type: string
+        message:
+          type: string
+        data:
+          type: object
+          nullable: true
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AnalyticsSummary:
+      type: object
+      properties:
+        total:
+          type: integer
+        resolved:
+          type: integer
+        pending:
+          type: integer
+        resolvedPercentage:
+          type: integer
+
+    OrgAdminAnalytics:
+      type: object
+      properties:
+        departments:
+          type: array
+          items:
+            type: object
+            properties:
+              departmentId:
+                type: string
+              name:
+                type: string
+              total:
+                type: integer
+              resolved:
+                type: integer
+              pending:
+                type: integer
+              resolvedPercentage:
+                type: integer
+        deptAdmins:
+          type: array
+          items:
+            type: object
+            properties:
+              deptAdminId:
+                type: string
+              fullName:
+                type: string
+              total:
+                type: integer
+              resolved:
+                type: integer
+              pending:
+                type: integer
+              resolvedPercentage:
+                type: integer
+
+    SysAdminAnalytics:
+      type: object
+      properties:
+        organizations:
+          type: array
+          items:
+            type: object
+            properties:
+              organization:
+                type: string
+              total:
+                type: integer
+              resolved:
+                type: integer
+              pending:
+                type: integer
+              resolvedPercentage:
+                type: integer
+        orgAdmins:
+          type: array
+          items:
+            type: object
+            properties:
+              orgAdminId:
+                type: string
+              fullName:
+                type: string
+              organization:
+                type: string
+              total:
+                type: integer
+              resolved:
+                type: integer
+              pending:
+                type: integer
+              resolvedPercentage:
+                type: integer
 
   responses:
     Unauthorized:
@@ -258,7 +414,6 @@ paths:
   /auth/register:
     post:
       summary: Register a new citizen user (self-registration)
-      description: Only citizens can self-register. Other roles must be registered by an upper admin.
       tags: [Authentication]
       requestBody:
         required: true
@@ -270,15 +425,12 @@ paths:
               properties:
                 fullName:
                   type: string
-                  example: "Abebe Kebede"
                 email:
                   type: string
                   format: email
-                  example: "abebe.kebede@example.com"
                 password:
                   type: string
                   minLength: 8
-                  example: "securepassword123"
       responses:
         '201':
           description: User registered successfully
@@ -303,7 +455,6 @@ paths:
   /auth/login:
     post:
       summary: Authenticate user and get JWT
-      description: Login is available for all user roles.
       tags: [Authentication]
       requestBody:
         required: true
@@ -315,11 +466,8 @@ paths:
               properties:
                 email:
                   type: string
-                  format: email
-                  example: "abebe.kebede@example.com"
                 password:
                   type: string
-                  example: "securepassword123"
       responses:
         '200':
           description: Login successful
@@ -330,12 +478,10 @@ paths:
                 properties:
                   message:
                     type: string
-                    example: "Login successful"
                   _id:
                     type: string
                   role:
                     type: string
-                    enum: [Citizen, DeptAdmin, OrgAdmin, SysAdmin]
                   token:
                     type: string
         '400':
@@ -344,17 +490,12 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: Account deactivated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         '500':
           $ref: '#/components/responses/ServerError'
 
   /auth/forgot-password:
     post:
       summary: Request password reset
-      description: Send a password reset link to the user's email.
       tags: [Authentication]
       requestBody:
         required: true
@@ -366,19 +507,9 @@ paths:
               properties:
                 email:
                   type: string
-                  format: email
-                  example: "abebe.kebede@example.com"
       responses:
         '200':
           description: Reset link sent
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "A reset link has been sent."
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
@@ -387,7 +518,6 @@ paths:
   /auth/reset-password:
     post:
       summary: Reset password with token
-      description: Set a new password using the reset token.
       tags: [Authentication]
       requestBody:
         required: true
@@ -399,26 +529,13 @@ paths:
               properties:
                 token:
                   type: string
-                  example: "abc123def456"
                 email:
                   type: string
-                  format: email
-                  example: "abebe.kebede@example.com"
                 password:
                   type: string
-                  minLength: 8
-                  example: "newsecurepassword123"
       responses:
         '200':
           description: Password reset successful
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Password reset successful. Please login."
         '400':
           $ref: '#/components/responses/BadRequest'
         '500':
@@ -432,7 +549,7 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: User profile retrieved successfully
+          description: User profile
           content:
             application/json:
               schema:
@@ -460,22 +577,11 @@ paths:
               properties:
                 oldPassword:
                   type: string
-                  example: "currentPassword123"
                 newPassword:
                   type: string
-                  minLength: 8
-                  example: "newSecurePassword456"
       responses:
         '200':
-          description: Password changed successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Password changed successfully. Please log in again with the new password."
+          description: Password changed
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -496,23 +602,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [fullName, email, password, organization]
+              required: [fullName, email, password, organizationId]
               properties:
                 fullName:
                   type: string
-                  example: "John Doe"
                 email:
                   type: string
-                  format: email
-                  example: "orgadmin@eep.com.et"
                 password:
                   type: string
-                  minLength: 8
-                  example: "securepassword123"
-                organization:
+                organizationId:
                   type: string
-                  enum: [EEP, AAWSA]
-                  example: "EEP"
+                  description: ObjectId of the organization
       responses:
         '201':
           description: OrgAdmin created
@@ -539,6 +639,100 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/ServerError'
+    get:
+      summary: List all Organization Admins (SysAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of OrgAdmins
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /users/org-admins/{id}:
+    put:
+      summary: Update an Organization Admin (SysAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                email:
+                  type: string
+                employeeID:
+                  type: string
+      responses:
+        '200':
+          description: OrgAdmin updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /users/org-admins/{id}/deactivate:
+    put:
+      summary: Deactivate an Organization Admin (SysAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OrgAdmin deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
 
   /users/dept-admins:
     post:
@@ -556,19 +750,12 @@ paths:
               properties:
                 fullName:
                   type: string
-                  example: "Jane Smith"
                 email:
                   type: string
-                  format: email
-                  example: "deptadmin@eep.com.et"
                 password:
                   type: string
-                  minLength: 8
-                  example: "securepassword123"
                 departmentId:
                   type: string
-                  description: ObjectId of the department the admin will manage
-                  example: "67c4a8b9f2e3d4c5e6789078"
       responses:
         '201':
           description: DeptAdmin created
@@ -597,16 +784,14 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/ServerError'
-
-  /users:
     get:
-      summary: List users (SysAdmin sees all, OrgAdmin sees their own DeptAdmins & Citizens)
+      summary: List all Department Admins in the OrgAdmin's organization (OrgAdmin only)
       tags: [Users]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: List of users
+          description: List of DeptAdmins
           content:
             application/json:
               schema:
@@ -617,6 +802,212 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /users/dept-admins/{id}:
+    put:
+      summary: Update a Department Admin (OrgAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                email:
+                  type: string
+                employeeID:
+                  type: string
+                departmentId:
+                  type: string
+      responses:
+        '200':
+          description: DeptAdmin updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /users/dept-admins/{id}/deactivate:
+    put:
+      summary: Deactivate a Department Admin (OrgAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DeptAdmin deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  
+
+  # ========== ORGANIZATIONS ==========
+  /organizations:
+    post:
+      summary: Create a new organization (SysAdmin only)
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code]
+              properties:
+                name:
+                  type: string
+                code:
+                  type: string
+      responses:
+        '201':
+          description: Organization created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+    get:
+      summary: List all active organizations (SysAdmin only)
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of organizations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Organization'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /organizations/{id}:
+    put:
+      summary: Update organization (SysAdmin only)
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                code:
+                  type: string
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: Organization updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Organization'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /organizations/{id}/deactivate:
+    put:
+      summary: Deactivate organization (SysAdmin only)
+      tags: [Organizations]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Organization deactivated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/ServerError'
 
@@ -637,16 +1028,12 @@ paths:
               properties:
                 name:
                   type: string
-                  example: "EEP - Customer Service"
                 code:
                   type: string
-                  example: "CS_EEP"
                 description:
                   type: string
-                  example: "Handles billing, outages, meter issues, and general complaints."
                 head:
                   type: string
-                  description: User ID of the DeptAdmin (optional)
       responses:
         '201':
           description: Department created
@@ -742,14 +1129,8 @@ paths:
       responses:
         '200':
           description: Department deactivated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Department deactivated successfully"
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -776,37 +1157,20 @@ paths:
               properties:
                 title:
                   type: string
-                  example: "Pothole on Bole Road"
                 description:
                   type: string
-                  example: "Large pothole causing traffic accidents"
                 category:
                   type: string
-                  example: "Road Infrastructure"
                 location:
                   type: object
-                  properties:
-                    coordinates:
-                      type: array
-                      items:
-                        type: number
-                      minItems: 2
-                      maxItems: 2
-                      example: [38.7636, 9.0250]
-                    locationName:
-                      type: string
-                      example: "Bole Road, Addis Ababa"
                 priority:
                   type: string
                   enum: [Low, Medium, High, Critical]
-                  default: Medium
                 department:
                   type: string
-                  description: Department ID where the complaint should be routed
-                  example: "67c4a8b9f2e3d4c5e6789078"
       responses:
         '201':
-          description: Complaint submitted successfully
+          description: Complaint submitted
           content:
             application/json:
               schema:
@@ -828,7 +1192,7 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: List of complaints submitted by the user
+          description: List of complaints
           content:
             application/json:
               schema:
@@ -854,26 +1218,16 @@ paths:
           schema:
             type: string
             enum: [Submitted, In Progress, Resolved, Rejected]
-          description: Filter by status
       responses:
         '200':
-          description: Assigned complaints with summary stats
+          description: Assigned complaints with stats
           content:
             application/json:
               schema:
                 type: object
                 properties:
                   summary:
-                    type: object
-                    properties:
-                      total:
-                        type: integer
-                      resolved:
-                        type: integer
-                      pending:
-                        type: integer
-                      resolvedPercentage:
-                        type: integer
+                    $ref: '#/components/schemas/AnalyticsSummary'
                   data:
                     type: array
                     items:
@@ -887,7 +1241,7 @@ paths:
 
   /complaints/{id}/status:
     put:
-      summary: Update complaint status and/or add comment (DeptAdmin only)
+      summary: Update complaint status  (DeptAdmin only)
       tags: [Complaints]
       security:
         - bearerAuth: []
@@ -907,22 +1261,11 @@ paths:
                 status:
                   type: string
                   enum: [Submitted, In Progress, Resolved, Rejected]
-                  example: "In Progress"
                 comment:
                   type: string
-                  example: "Crew dispatched to fix the pothole."
       responses:
         '200':
           description: Status updated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  complaint:
-                    $ref: '#/components/schemas/Complaint'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -936,7 +1279,7 @@ paths:
 
   /complaints/{id}/assign:
     put:
-      summary: Assign complaint to a department or specific DeptAdmin (OrgAdmin/SysAdmin only)
+      summary: Assign complaint to a department or DeptAdmin (OrgAdmin/SysAdmin only)
       tags: [Complaints]
       security:
         - bearerAuth: []
@@ -955,25 +1298,13 @@ paths:
               properties:
                 assignedTo:
                   type: string
-                  description: User ID of the DeptAdmin (optional)
                 department:
                   type: string
-                  description: Department ID (optional, but at least one required)
                 note:
                   type: string
-                  description: Assignment note
       responses:
         '200':
           description: Complaint assigned
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  complaint:
-                    $ref: '#/components/schemas/Complaint'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1035,7 +1366,6 @@ paths:
               properties:
                 commentText:
                   type: string
-                  example: "Will update by tomorrow."
       responses:
         '201':
           description: Comment added
@@ -1079,5 +1409,134 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ========== NOTIFICATIONS ==========
+  /notifications:
+    get:
+      summary: Get current user's notifications (authenticated users only)
+      tags: [Notifications]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /notifications/{id}/read:
+    put:
+      summary: Mark a single notification as read
+      tags: [Notifications]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /notifications/read-all:
+    put:
+      summary: Mark all notifications as read for the current user
+      tags: [Notifications]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  # ========== ANALYTICS ==========
+  /analytics/dept-admin:
+    get:
+      summary: Get dashboard statistics for the logged-in DeptAdmin
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: DeptAdmin analytics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /analytics/org-admin:
+    get:
+      summary: Get dashboard statistics for the logged-in OrgAdmin
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: OrgAdmin analytics (departments and DeptAdmins)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrgAdminAnalytics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /analytics/sys-admin:
+    get:
+      summary: Get dashboard statistics for SysAdmin
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: SysAdmin analytics (organizations and OrgAdmins)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SysAdminAnalytics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/ServerError'

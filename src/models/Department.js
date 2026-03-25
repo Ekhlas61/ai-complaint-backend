@@ -30,6 +30,11 @@ const departmentSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    organization: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,
+    }
   },
   { timestamps: true }
 );

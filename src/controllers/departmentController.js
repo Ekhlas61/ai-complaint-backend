@@ -13,6 +13,11 @@ exports.createDepartment = async (req, res) => {
       return res.status(400).json({ message: 'Name and code are required' });
     }
 
+    // Ensure the OrgAdmin has an organization assigned
+    if (!req.user.organization) {
+      return res.status(403).json({ message: 'Your account is not associated with an organization' });
+    }
+
     const existing = await Department.findOne({ $or: [{ name }, { code }] });
     if (existing) {
       return res.status(400).json({ message: 'Name or code already in use' });
@@ -23,9 +28,10 @@ exports.createDepartment = async (req, res) => {
       code: code.toUpperCase().trim(),
       description,
       head: head || null,
+      organization: req.user.organization,   // link to the OrgAdmin's organization
     });
 
-    // Audit
+    // Audit log
     await AuditLog.create({
       user: req.user._id,
       action: 'DEPARTMENT_CREATE',
@@ -43,12 +49,20 @@ exports.createDepartment = async (req, res) => {
 };
 
 // ────────────────────────────────────────────────
-// OrgAdmin: List all active departments
+// OrgAdmin: List all active departments (only for their organization)
 // ────────────────────────────────────────────────
 exports.getDepartments = async (req, res) => {
   try {
-    const departments = await Department.find({ isActive: true })
+    if (!req.user.organization) {
+      return res.status(403).json({ message: 'Your account is not associated with an organization' });
+    }
+
+    const departments = await Department.find({
+      isActive: true,
+      organization: req.user.organization,
+    })
       .populate('head', 'fullName email')
+      .populate('organization', 'name code')
       .sort({ name: 1 });
 
     res.json(departments);
@@ -58,7 +72,7 @@ exports.getDepartments = async (req, res) => {
 };
 
 // ────────────────────────────────────────────────
-// OrgAdmin: Update department
+// OrgAdmin: Update department (must belong to their organization)
 // ────────────────────────────────────────────────
 exports.updateDepartment = async (req, res) => {
   try {
@@ -68,6 +82,11 @@ exports.updateDepartment = async (req, res) => {
     const department = await Department.findById(id);
     if (!department) {
       return res.status(404).json({ message: 'Department not found' });
+    }
+
+    // Ensure the department belongs to the OrgAdmin's organization
+    if (department.organization.toString() !== req.user.organization.toString()) {
+      return res.status(403).json({ message: 'You can only update departments of your own organization' });
     }
 
     // Only allow certain fields
@@ -103,6 +122,11 @@ exports.deactivateDepartment = async (req, res) => {
     const department = await Department.findById(id);
     if (!department) {
       return res.status(404).json({ message: 'Department not found' });
+    }
+
+    // Ensure the department belongs to the OrgAdmin's organization
+    if (department.organization.toString() !== req.user.organization.toString()) {
+      return res.status(403).json({ message: 'You can only deactivate departments of your own organization' });
     }
 
     if (!department.isActive) {

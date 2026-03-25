@@ -1,8 +1,8 @@
-// seeds/adminSeeder.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const Department = require('../models/Department');
+const Organization = require('../models/Organization');
 require('dotenv').config();
 
 const connectDB = async () => {
@@ -21,75 +21,100 @@ const seedAdmins = async () => {
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(defaultPassword, salt);
 
-    // ===== 1. SysAdmin =====
-    const sysAdmin = {
-      fullName: 'System Administrator',
-      email: 'sysadmin@complaint.gov',
-      passwordHash,
-      role: 'SysAdmin',
-      loginMethod: 'manual',
-      isActive: true,
-      // no organization, no department
-    };
+    // Create organizations
+    const eepOrg = await Organization.findOneAndUpdate(
+      { code: 'EEP' },
+      { name: 'EEP', code: 'EEP', isActive: true },
+      { upsert: true, returnDocument: 'after' }
+    );
+    const aawsaOrg = await Organization.findOneAndUpdate(
+      { code: 'AAWSA' },
+      { name: 'AAWSA', code: 'AAWSA', isActive: true },
+      { upsert: true, returnDocument: 'after' }
+    );
+    console.log('Organizations seeded');
 
-    // ===== 2. OrgAdmins =====
-    const eepOrgAdmin = {
-      fullName: 'EEP Organization Admin',
-      email: 'admin@eep.com.et',
-      passwordHash,
-      role: 'OrgAdmin',
-      loginMethod: 'manual',
-      isActive: true,
-      organization: 'EEP',
-    };
+    // SysAdmin (no organization)
+    await User.findOneAndUpdate(
+      { email: 'sysadmin@complaint.gov' },
+      {
+        fullName: 'System Administrator',
+        email: 'sysadmin@complaint.gov',
+        passwordHash,
+        role: 'SysAdmin',
+        loginMethod: 'manual',
+        isActive: true,
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+    console.log('SysAdmin seeded');
 
-    const aawsaOrgAdmin = {
-      fullName: 'AAWSA Organization Admin',
-      email: 'admin@aawsa.gov.et',
-      passwordHash,
-      role: 'OrgAdmin',
-      loginMethod: 'manual',
-      isActive: true,
-      organization: 'AAWSA',
-    };
+    // OrgAdmins
+    await User.findOneAndUpdate(
+      { email: 'admin@eep.com.et' },
+      {
+        fullName: 'EEP Organization Admin',
+        email: 'admin@eep.com.et',
+        passwordHash,
+        role: 'OrgAdmin',
+        loginMethod: 'manual',
+        isActive: true,
+        organization: eepOrg._id,
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+    await User.findOneAndUpdate(
+      { email: 'admin@aawsa.gov.et' },
+      {
+        fullName: 'AAWSA Organization Admin',
+        email: 'admin@aawsa.gov.et',
+        passwordHash,
+        role: 'OrgAdmin',
+        loginMethod: 'manual',
+        isActive: true,
+        organization: aawsaOrg._id,
+      },
+      { upsert: true, returnDocument: 'after' }
+    );
+    console.log('OrgAdmins seeded');
 
-    // ===== 3. Departments (complaint-handling only) =====
+    // Departments
     const departmentsData = [
       {
         name: 'EEP - Customer Service',
         code: 'CS_EEP',
+        organization: eepOrg._id,
         description: 'Handles billing, outages, meter issues, and general complaints.',
         isActive: true,
-        // head will be set later
       },
       {
         name: 'AAWSA - Water Services',
         code: 'WATER_AAWSA',
+        organization: aawsaOrg._id,
         description: 'Water supply interruptions, leaks, billing, new connections.',
         isActive: true,
       },
       {
         name: 'AAWSA - Sewerage & Sanitation',
         code: 'SEWER_AAWSA',
+        organization: aawsaOrg._id,
         description: 'Drainage blockages, sewer backups, sanitation complaints.',
         isActive: true,
       },
     ];
 
-    // Create/update departments and store references
     const departments = {};
     for (const deptData of departmentsData) {
-      let department = await Department.findOne({ code: deptData.code });
-      if (!department) {
-        department = await Department.create(deptData);
-        console.log(`✅ Department created: ${department.name} (${department.code})`);
-      } else {
-        console.log(`⚠️ Department already exists: ${department.name}`);
-      }
+      const department = await Department.findOneAndUpdate(
+        { code: deptData.code },
+        deptData,
+        { upsert: true, returnDocument: 'after' }
+      );
       departments[deptData.code] = department;
+      console.log(`Department seeded: ${department.name}`);
     }
 
-    // ===== 4. DeptAdmins =====
+    // DeptAdmins
     const deptAdminsData = [
       {
         fullName: 'EEP Customer Service Manager',
@@ -98,8 +123,8 @@ const seedAdmins = async () => {
         role: 'DeptAdmin',
         loginMethod: 'manual',
         isActive: true,
-        organization: 'EEP',
-        department: departments['CS_EEP']._id, // link to department
+        organization: eepOrg._id,
+        department: departments['CS_EEP']._id,
       },
       {
         fullName: 'AAWSA Water Services Manager',
@@ -108,7 +133,7 @@ const seedAdmins = async () => {
         role: 'DeptAdmin',
         loginMethod: 'manual',
         isActive: true,
-        organization: 'AAWSA',
+        organization: aawsaOrg._id,
         department: departments['WATER_AAWSA']._id,
       },
       {
@@ -118,28 +143,22 @@ const seedAdmins = async () => {
         role: 'DeptAdmin',
         loginMethod: 'manual',
         isActive: true,
-        organization: 'AAWSA',
+        organization: aawsaOrg._id,
         department: departments['SEWER_AAWSA']._id,
       },
     ];
 
-    // ===== 5. Insert all users =====
-    const allUsers = [sysAdmin, eepOrgAdmin, aawsaOrgAdmin, ...deptAdminsData];
-
-    for (const user of allUsers) {
-      const existing = await User.findOne({ email: user.email });
-      if (!existing) {
-        const newUser = await User.create(user);
-        console.log(`✅ User created: ${user.email} (${user.role})`);
-
-        // If this user is a DeptAdmin, update the department's head field
-        if (user.role === 'DeptAdmin' && user.department) {
-          await Department.findByIdAndUpdate(user.department, { head: newUser._id });
-          console.log(`   ↳ Linked as head of department: ${user.department}`);
-        }
-      } else {
-        console.log(`⚠️ User already exists: ${user.email}`);
+    for (const deptAdmin of deptAdminsData) {
+      const user = await User.findOneAndUpdate(
+        { email: deptAdmin.email },
+        deptAdmin,
+        { upsert: true, returnDocument: 'after' }
+      );
+      // Set the department head to this DeptAdmin (overwrite if already set)
+      if (deptAdmin.department) {
+        await Department.findByIdAndUpdate(deptAdmin.department, { head: user._id });
       }
+      console.log(`DeptAdmin seeded: ${user.email}`);
     }
 
     console.log('Seeding completed.');

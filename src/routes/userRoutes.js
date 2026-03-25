@@ -5,16 +5,26 @@ const { authorizeRoles } = require('../middleware/roleMiddleware');
 const {
   createOrgAdmin,
   createDeptAdmin,
-  listUsers,
+  updateOrgAdmin,
+  deactivateOrgAdmin,
+  getOrgAdmins,
+  updateDeptAdmin,
+  deactivateDeptAdmin,
+  getDeptAdmins,
 } = require('../controllers/userController');
 
-// SysAdmin only
+// ========== SysAdmin routes (OrgAdmin management) ==========
 router.post('/org-admins', protect, authorizeRoles('SysAdmin'), createOrgAdmin);
+router.get('/org-admins', protect, authorizeRoles('SysAdmin'), getOrgAdmins);
+router.put('/org-admins/:id', protect, authorizeRoles('SysAdmin'), updateOrgAdmin);
+router.put('/org-admins/:id/deactivate', protect, authorizeRoles('SysAdmin'), deactivateOrgAdmin);
 
-// OrgAdmin only
+// ========== OrgAdmin routes (DeptAdmin management) ==========
 router.post('/dept-admins', protect, authorizeRoles('OrgAdmin'), createDeptAdmin);
+router.get('/dept-admins', protect, authorizeRoles('OrgAdmin'), getDeptAdmins);
+router.put('/dept-admins/:id', protect, authorizeRoles('OrgAdmin'), updateDeptAdmin);
+router.put('/dept-admins/:id/deactivate', protect, authorizeRoles('OrgAdmin'), deactivateDeptAdmin);
 
-// Both SysAdmin and OrgAdmin can list users (different filters)
-router.get('/', protect, authorizeRoles('SysAdmin', 'OrgAdmin'), listUsers);
+
 
 module.exports = router;

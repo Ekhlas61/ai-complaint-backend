@@ -106,7 +106,6 @@ exports.forgotPassword = async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
-      
       return res.status(200).json({
         message: ' A reset link has been sent.',
       });
@@ -115,7 +114,9 @@ exports.forgotPassword = async (req, res) => {
     // Generate token
     const resetToken = crypto.randomBytes(32).toString('hex');
 
-    
+    // Log the token for testing (remove in production)
+    console.log(`RESET TOKEN FOR ${email}: ${resetToken}`);
+
     user.resetPasswordToken = crypto
       .createHash('sha256')
       .update(resetToken)
@@ -125,8 +126,9 @@ exports.forgotPassword = async (req, res) => {
 
     await user.save();
 
-    // Create reset URL
-    const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
+    // Create reset URL (use localhost frontend if FRONTEND_URL not set)
+    const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const resetUrl = `${frontend}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
     const html = `
       <h2>Password Reset Request</h2>
@@ -137,15 +139,35 @@ exports.forgotPassword = async (req, res) => {
     `;
 
     try {
-      await sendEmail({
+      const sendResult = await sendEmail({
         to: user.email,
         subject: 'Complaint System - Reset Your Password',
         html,
       });
 
-      res.status(200).json({
-        message: 'A reset link has been sent.',
-      });
+      console.log('sendResult from sendEmail:', sendResult);
+
+      // If sendEmail returned an error object, surface it for debugging
+      if (sendResult && sendResult.error) {
+        console.error('Email send failed:', sendResult);
+        user.resetPasswordToken = null;
+        user.resetPasswordExpire = null;
+        await user.save();
+        return res.status(500).json({ 
+          message: 'Email could not be sent', 
+          error: sendResult.error 
+        });
+      }
+
+      // If using Ethereal or test account, include previewUrl to help local testing
+      if (sendResult && sendResult.previewUrl) {
+        return res.status(200).json({
+          message: 'A reset link has been sent (preview available).',
+          previewUrl: sendResult.previewUrl,
+        });
+      }
+
+      return res.status(200).json({ message: 'A reset link has been sent.' });
     } catch (emailErr) {
       console.error('Email send error:', emailErr);
       user.resetPasswordToken = null;

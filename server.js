@@ -14,6 +14,7 @@ const authRoutes = require('./src/routes/authRoutes');
 const complaintRoutes = require('./src/routes/complaintRoutes');
 const departmentRoutes = require('./src/routes/departmentRoutes');
 const userRoutes = require('./src/routes/userRoutes');
+const debugRoutes = require('./src/routes/debugRoutes');
 const analyticsRoutes = require('./src/routes/analyticsRoutes');
 const organizationRoutes = require('./src/routes/organizationRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
@@ -80,8 +81,12 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps, curl, etc.)
     if (!origin) return callback(null, true);
-    // Allow if origin is in the allowed list OR if not in production (development)
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+    // In development, allow any origin (optional)
+    if (process.env.NODE_ENV !== 'production') {
+      return callback(null, true);
+    }
+    // In production, only allow specific origins
+    if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -107,6 +112,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/complaints', complaintRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/debug', debugRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/notifications', notificationRoutes);
