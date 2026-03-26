@@ -36,12 +36,34 @@ exports.getOrgAdminStats = async (req, res) => {
       isActive: true,
     }).select('_id name');
 
-    const deptStats = await Promise.all(departments.map(async (dept) => {
-      const stats = await getStats({ department: dept._id });
-      return { departmentId: dept._id, name: dept.name, ...stats };
-    }));
+    // Count total DeptAdmins in this organization
+    const totalAdmins = await User.countDocuments({
+      role: 'DeptAdmin',
+      organization: orgId,
+      isActive: true,
+    });
 
-    res.json({ departments: deptStats });
+    // Get overall stats for this organization (across all its departments)
+   
+    let overall = { total: 0, resolved: 0, pending: 0, resolvedPercentage: 0 };
+    const deptStats = [];
+    for (const dept of departments) {
+      const stats = await getStats({ department: dept._id });
+      deptStats.push({ departmentId: dept._id, name: dept.name, ...stats });
+      overall.total += stats.total;
+      overall.resolved += stats.resolved;
+      overall.pending += stats.pending;
+    }
+    overall.resolvedPercentage = overall.total === 0 ? 0 : Math.round((overall.resolved / overall.total) * 100);
+
+    const summary = {
+      totalDepartments: departments.length,
+      totalAdmins,
+      totalResolved: overall.resolved,
+      totalPending: overall.pending,
+    };
+
+    res.json({ summary, departments: deptStats });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -53,9 +75,11 @@ exports.getSysAdminStats = async (req, res) => {
     // Get all active organizations
     const organizations = await Organization.find({ isActive: true }).select('_id name');
 
+    // Overall stats across all complaints
+    const overallStats = await getStats({});
+
     // Per organization stats
     const orgStats = await Promise.all(organizations.map(async (org) => {
-      // All departments belonging to this organization
       const depts = await Department.find({
         organization: org._id,
         isActive: true,
@@ -65,7 +89,7 @@ exports.getSysAdminStats = async (req, res) => {
       return { organizationId: org._id, name: org.name, ...stats };
     }));
 
-    res.json({ organizations: orgStats });
+    res.json({ overall: overallStats, organizations: orgStats });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
