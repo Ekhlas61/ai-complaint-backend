@@ -79,10 +79,56 @@ const seedAdmins = async () => {
       },
       { upsert: true, returnDocument: 'after' }
     );
+
     console.log('OrgAdmins seeded:', {
       eep: { id: eepOrgAdmin._id, email: eepOrgAdmin.email, orgId: eepOrgAdmin.organization },
       aawsa: { id: aawsaOrgAdmin._id, email: aawsaOrgAdmin.email, orgId: aawsaOrgAdmin.organization },
     });
+
+          // OrgAdmins
+      await User.findOneAndUpdate(
+        { email: 'admin@eep.com.et' },
+        {
+          fullName: 'EEP Organization Admin',
+          email: 'admin@eep.com.et',
+          passwordHash,
+          role: 'OrgAdmin',
+          loginMethod: 'manual',
+          isActive: true,
+          organization: eepOrg._id,
+        },
+        { upsert: true, returnDocument: 'after' }
+      );
+      await User.findOneAndUpdate(
+        { email: 'admin@aawsa.gov.et' },
+        {
+          fullName: 'AAWSA Organization Admin',
+          email: 'admin@aawsa.gov.et',
+          passwordHash,
+          role: 'OrgAdmin',
+          loginMethod: 'manual',
+          isActive: true,
+          organization: aawsaOrg._id,
+        },
+        { upsert: true, returnDocument: 'after' }
+      );
+      console.log('OrgAdmins seeded');
+
+      // Additional OrgAdmin for EEP
+      await User.findOneAndUpdate(
+        { email: 'eepadmin@gmail.com' },
+        {
+          fullName: 'EEP Organization Admin 2',
+          email: 'eepadmin@gmail.com',
+          passwordHash,
+          role: 'OrgAdmin',
+          loginMethod: 'manual',
+          isActive: true,
+          organization: eepOrg._id,
+        },
+        { upsert: true, returnDocument: 'after' }
+      );
+      console.log('Second EEP OrgAdmin seeded');
 
     // Departments
     const departmentsData = [

@@ -988,9 +988,6 @@ paths:
                   type: string
                 description:
                   type: string
-                head:
-                  type: string
-                  description: ObjectId of the DeptAdmin (optional)
       responses:
         '201':
           description: Department created
@@ -1050,8 +1047,6 @@ paths:
                 code:
                   type: string
                 description:
-                  type: string
-                head:
                   type: string
       responses:
         '200':

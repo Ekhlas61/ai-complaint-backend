@@ -21,11 +21,7 @@ const departmentSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    head: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User', // reference to DeptAdmin (optional)
-      default: null,
-    },
+   
     isActive: {
       type: Boolean,
       default: true,

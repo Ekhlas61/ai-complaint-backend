@@ -7,7 +7,7 @@ const mongoose = require('mongoose');
 // ────────────────────────────────────────────────
 exports.createDepartment = async (req, res) => {
   try {
-    const { name, code, description, head } = req.body;
+    const { name, code, description } = req.body;
 
     // Basic validation
     if (!name || !code) {
@@ -19,19 +19,7 @@ exports.createDepartment = async (req, res) => {
       return res.status(403).json({ message: 'Your account is not associated with an organization' });
     }
 
-    if (head) {
-  if (!mongoose.Types.ObjectId.isValid(head)) {
-    return res.status(400).json({ message: 'Invalid head ID. Must be a valid DeptAdmin ID.' });
-  }
-  const headUser = await User.findById(head);
-  if (!headUser || headUser.role !== 'DeptAdmin') {
-    return res.status(400).json({ message: 'Head must be a valid DeptAdmin user.' });
-  }
-  if (headUser.organization.toString() !== req.user.organization.toString()) {
-    return res.status(403).json({ message: 'Head must belong to your organization.' });
-  }
-}
-
+   
     const existing = await Department.findOne({ $or: [{ name }, { code }] });
     if (existing) {
       return res.status(400).json({ message: 'Name or code already in use' });
@@ -41,7 +29,6 @@ exports.createDepartment = async (req, res) => {
       name,
       code: code.toUpperCase().trim(),
       description,
-      head: head || null,
       organization: req.user.organization,   
     });
 
@@ -75,7 +62,7 @@ exports.getDepartments = async (req, res) => {
       isActive: true,
       organization: req.user.organization,
     })
-      .populate('head', 'fullName email')
+      .populate('fullName email')
       .populate('organization', 'name code')
       .sort({ name: 1 });
 
@@ -107,7 +94,7 @@ exports.updateDepartment = async (req, res) => {
     if (updates.name) department.name = updates.name.trim();
     if (updates.code) department.code = updates.code.toUpperCase().trim();
     if (updates.description !== undefined) department.description = updates.description?.trim() || '';
-    if (updates.head !== undefined) department.head = updates.head || null;
+  
 
     await department.save();
 
