@@ -62,7 +62,6 @@ exports.getDepartments = async (req, res) => {
       isActive: true,
       organization: req.user.organization,
     })
-      .populate('fullName email')
       .populate('organization', 'name code')
       .sort({ name: 1 });
 
