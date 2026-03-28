@@ -75,7 +75,10 @@ app.set('io', io);
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
   'http://localhost:5000',     
-  'https://ai-complaint-backend-7xc5.onrender.com',           
+  'https://ai-complaint-backend-7xc5.onrender.com',
+  'http://localhost:50510', // Flutter development
+  'http://localhost:3000',  // Common React development
+  'http://localhost:8080',  // Common Vue/Angular development           
 ];
 
 app.use(cors({
@@ -86,8 +89,8 @@ app.use(cors({
     if (process.env.NODE_ENV !== 'production') {
       return callback(null, true);
     }
-    // In production, only allow specific origins
-    if (allowedOrigins.indexOf(origin) !== -1) {
+    // In production, allow specific origins and localhost for development
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.startsWith('http://localhost:')) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
