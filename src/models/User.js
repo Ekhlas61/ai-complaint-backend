@@ -66,6 +66,11 @@ const userSchema = new mongoose.Schema(
         default: null,
     },
 
+    resetPasswordOTP: {
+        type: String,
+        default: null,
+    },
+
     lastLogin: {
       type: Date,
       default: null,

@@ -7,7 +7,7 @@ const sendEmail = async ({ to, subject, html }) => {
 
   if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
     transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.ethereal.email',
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
       port: process.env.EMAIL_PORT || 587,
       secure: process.env.EMAIL_PORT === 465, // true for port 465, false for others
       auth: {
@@ -35,7 +35,7 @@ const sendEmail = async ({ to, subject, html }) => {
   }
 
   const mailOptions = {
-    from: `${process.env.EMAIL_FROM || '"Complaint System" <no-reply@yourapp.com>'}`,
+    from: process.env.EMAIL_FROM || '"Complaint System" <no-reply@yourapp.com>',
     to,
     subject,
     html,
@@ -50,11 +50,17 @@ const sendEmail = async ({ to, subject, html }) => {
       return { info, previewUrl };
     }
 
-    return { info };
+    // For real email services (Gmail), just return success info
+    return { info, success: true };
   } catch (err) {
     // Return error details to caller so higher-level handlers can decide how to respond
     return { error: err.message, stack: err.stack };
   }
 };
 
-module.exports = sendEmail;
+// Generate OTP code
+const generateOTP = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+module.exports = { sendEmail, generateOTP };

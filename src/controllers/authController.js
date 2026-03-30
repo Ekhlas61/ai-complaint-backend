@@ -2,7 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const crypto = require('crypto');
-const sendEmail = require('../utils/email');
+const { sendEmail, generateOTP } = require('../utils/email');
 
 // 🔑 Generate Token
 const generateToken = (user) => {
@@ -170,7 +170,8 @@ exports.forgotPassword = async (req, res) => {
         });
       }
 
-      return res.status(200).json({ message: 'A reset link has been sent.' });
+      // For real email services, return success message
+      return res.status(200).json({ message: 'A reset link has been sent to your email.' });
     } catch (emailErr) {
       console.error('Email send error:', emailErr);
       user.resetPasswordToken = null;
@@ -181,6 +182,121 @@ exports.forgotPassword = async (req, res) => {
     }
   } catch (error) {
     console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Forgot Password with OTP - Send OTP to email
+exports.forgotPasswordOTP = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      // Don't reveal if user exists or not
+      return res.status(200).json({
+        message: 'If an account with this email exists, an OTP has been sent.',
+      });
+    }
+
+    // Generate OTP
+    const otp = generateOTP();
+    
+    // Store OTP with expiration (15 minutes)
+    user.resetPasswordOTP = otp;
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+    
+    await user.save();
+
+    console.log(`OTP FOR ${email}: ${otp}`);
+
+    const html = `
+      <h2>Password Reset OTP</h2>
+      <p>You requested a password reset for your Complaint System account.</p>
+      <p>Your OTP code is: <strong style="font-size: 24px; background-color: #f0f0f0; padding: 10px; border-radius: 5px;">${otp}</strong></p>
+      <p>This OTP will expire in 15 minutes.</p>
+      <p>If you didn't request this, ignore this email.</p>
+    `;
+
+    try {
+      const sendResult = await sendEmail({
+        to: user.email,
+        subject: 'Complaint System - Password Reset OTP',
+        html,
+      });
+
+      console.log('OTP send result:', sendResult);
+
+      if (sendResult && sendResult.error) {
+        console.error('OTP email send failed:', sendResult);
+        user.resetPasswordOTP = null;
+        user.resetPasswordExpire = null;
+        await user.save();
+        return res.status(500).json({ 
+          message: 'OTP could not be sent', 
+          error: sendResult.error 
+        });
+      }
+
+      if (sendResult && sendResult.previewUrl) {
+        return res.status(200).json({
+          message: 'OTP has been sent (preview available).',
+          previewUrl: sendResult.previewUrl,
+        });
+      }
+
+      return res.status(200).json({ message: 'OTP has been sent to your email.' });
+    } catch (emailErr) {
+      console.error('OTP email send error:', emailErr);
+      user.resetPasswordOTP = null;
+      user.resetPasswordExpire = null;
+      await user.save();
+
+      return res.status(500).json({ message: 'OTP could not be sent' });
+    }
+  } catch (error) {
+    console.error('Forgot password OTP error:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Reset Password with OTP
+exports.resetPasswordWithOTP = async (req, res) => {
+  try {
+    const { email, otp, password } = req.body;
+
+    if (!email || !otp || !password) {
+      return res.status(400).json({ message: 'Email, OTP, and new password are required' });
+    }
+
+    const user = await User.findOne({
+      email: email.toLowerCase(),
+      resetPasswordOTP: otp,
+      resetPasswordExpire: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    // Hash new password
+    const salt = await bcrypt.genSalt(10);
+    user.passwordHash = await bcrypt.hash(password, salt);
+
+    // Clear OTP fields
+    user.resetPasswordOTP = null;
+    user.resetPasswordExpire = null;
+
+    await user.save();
+
+    res.status(200).json({ message: 'Password reset successful. Please login.' });
+  } catch (error) {
+    console.error('Reset password with OTP error:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
