@@ -639,7 +639,160 @@ paths:
         '500':
           $ref: '#/components/responses/ServerError'
 
-  # ========== USER MANAGEMENT ==========
+  # ========== FILE UPLOADS ==========
+  /uploads/single:
+    post:
+      summary: Upload single file to S3
+      tags: [File Upload]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file to upload (JPEG, PNG, GIF or other allowed types)
+                folder:
+                  type: string
+                  description: Optional folder/path in S3
+              required: [file]
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: File uploaded successfully
+                  file:
+                    type: object
+                    properties:
+                      url:
+                        type: string
+                      key:
+                        type: string
+                      originalName:
+                        type: string
+                      size:
+                        type: integer
+                      mimetype:
+                        type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /uploads/multiple:
+    post:
+      summary: Upload multiple files to S3
+      tags: [File Upload]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: The files to upload (max 5)
+                folder:
+                  type: string
+                  description: Optional folder/path in S3
+              required: [files]
+      responses:
+        '200':
+          description: Files uploaded successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /uploads/complaint-images:
+    post:
+      summary: Upload complaint images to S3
+      tags: [File Upload]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: The images to upload (max 5)
+                complaintId:
+                  type: string
+                  description: ID of the complaint
+              required: [images]
+      responses:
+        '200':
+          description: Complaint images uploaded successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
+  /uploads/:
+    delete:
+      summary: Delete a file from S3
+      tags: [File Upload]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileKey]
+              properties:
+                fileKey:
+                  type: string
+                  description: S3 key of the file to delete
+      responses:
+        '200':
+          description: File deleted successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/ServerError'
+
   /users/org-admins:
     post:
       summary: Create a new Organization Admin (SysAdmin only)
@@ -658,29 +811,14 @@ paths:
                   type: string
                 email:
                   type: string
+                  format: email
                 password:
                   type: string
                 organizationId:
                   type: string
-                  description: ObjectId of the organization
       responses:
         '201':
           description: OrgAdmin created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  _id:
-                    type: string
-                  fullName:
-                    type: string
-                  email:
-                    type: string
-                  role:
-                    type: string
-                  organization:
-                    type: string
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -689,6 +827,7 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '500':
           $ref: '#/components/responses/ServerError'
+
     get:
       summary: List all Organization Admins (SysAdmin only)
       tags: [Users]

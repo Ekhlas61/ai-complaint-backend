@@ -9,7 +9,7 @@ const {
   // later: activateDepartment, deleteDepartment (hard delete if needed)
 } = require('../controllers/departmentController');
 
-const  protect  = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 
 // ────────────────────────────────────────────────
