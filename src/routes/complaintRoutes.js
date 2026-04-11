@@ -5,10 +5,10 @@ const {
   updateComplaintStatus,
   createComplaint,
   getMyComplaints,
-  getComplaintById,
-  assignComplaint,
   addComment,
   getComments,
+  getComplaintsByOrganization,
+  adminOverride,
 } = require('../controllers/complaintController');
 const protect = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
@@ -21,15 +21,12 @@ router.get('/my-complaints', protect, authorizeRoles('Citizen'), getMyComplaints
 router.get('/assigned', protect, authorizeRoles('DeptAdmin'), getAssignedComplaints);
 router.put('/:id/status', protect, authorizeRoles('DeptAdmin'), updateComplaintStatus);
 
-// OrgAdmin/SysAdmin routes
-router.put('/:id/assign', protect, authorizeRoles('OrgAdmin', 'SysAdmin'), assignComplaint);
+// OrgAdmin routes
+router.put('/:id/override', protect, authorizeRoles('OrgAdmin'), adminOverride);
+router.get('/organization', protect, authorizeRoles('OrgAdmin'), getComplaintsByOrganization);
 
-// General (role‑based access inside)
-router.get('/:id', protect, getComplaintById);
-// Comment routes (any authenticated user can comment – permissions checked inside)
-
-// Comment routes (any authenticated user can comment – permissions checked inside)
-router.post('/:id/comments', protect, addComment);
-router.get('/:id/comments', protect, getComments);
+// Comment routes 
+router.post('/:id/comments', protect,authorizeRoles('DeptAdmin','OrgAdmin'), addComment);
+router.get('/:id/comments', protect,authorizeRoles('DeptAdmin','OrgAdmin'), getComments);
 
 module.exports = router;

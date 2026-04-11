@@ -2,7 +2,6 @@ const mongoose = require('mongoose');
 
 const complaintSchema = new mongoose.Schema(
   {
-   
     title: {
       type: String,
       required: [true, 'Title is required'],
@@ -14,27 +13,19 @@ const complaintSchema = new mongoose.Schema(
       required: [true, 'Description is required'],
       trim: true,
     },
-     category: {
+    category: {
       type: String,
-      required: [true, 'Category is required'],
       trim: true,
+      default: null,              
     },
-    images: [
-      {
-        path: { type: String, required: true },           
-        uploadedAt: { type: Date, default: Date.now },
-        
-      },
-    ],
-
-   location: {
+    location: {
       type: {
         type: String,
         enum: ['Point'],
         default: 'Point',
       },
       coordinates: {
-        type: [Number], // [longitude, latitude]
+        type: [Number],            
         required: false,
       },
       locationName: {
@@ -42,25 +33,48 @@ const complaintSchema = new mongoose.Schema(
         trim: true,
       },
     },
+    imagePath: {
+      type: String,                
+      default: null,
+    },
     submittedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
     },
-
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Department',
-      required: true,
+      default: null,
+    },
+    organization: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      required: true,             
+    },
+    isSpam: {
+      type: Boolean,
+      default: false,
+    },
+    aiConfidence: {
+      type: Number,
+      min: 0,
+      max: 1,
+      default: null,
+    },
+    duplicateOf: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Complaint',
+      default: null,
     },
     assignedTo: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User', 
+      ref: 'User',
       default: null,
     },
     status: {
       type: String,
-      enum: ['Submitted', 'In Progress', 'Resolved', 'Rejected'],
+      enum: ['Submitted', 'In Progress', 'Resolved', 'Rejected', 'Manual Review'],
       default: 'Submitted',
     },
     priority: {
@@ -68,45 +82,47 @@ const complaintSchema = new mongoose.Schema(
       enum: ['Low', 'Medium', 'High', 'Critical'],
       default: 'Medium',
     },
-    // History of status changes / comments
+    // Track which AI fields have been manually overridden
+    overriddenFields: {
+      type: Map,
+      of: Boolean,
+      default: {},
+    },
     history: [
       {
-        action: String, // e.g. "Status changed to In Progress", "Comment added"
+        action: String,
         by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         comment: String,
         timestamp: { type: Date, default: Date.now },
       },
     ],
-
     syncStatus: {
       type: String,
       enum: ['Pending', 'Synced', 'Failed'],
       default: 'Pending',
     },
-
-
-    attachments: [
+    attachments: [                   // keep for backward compatibility
       {
         filename: String,
-        path: String, // or cloud URL
+        path: String,
         uploadedAt: { type: Date, default: Date.now },
       },
     ],
     deviceInfo: {
       type: String,
       trim: true,
-      
     },
     resolvedAt: Date,
   },
   { timestamps: true }
 );
 
-// Indexes for faster queries
+// Indexes
 complaintSchema.index({ submittedBy: 1, createdAt: -1 });
 complaintSchema.index({ assignedTo: 1, status: 1 });
 complaintSchema.index({ department: 1, status: 1 });
 complaintSchema.index({ status: 1 });
 complaintSchema.index({ 'location.coordinates': '2dsphere' });
+complaintSchema.index({ title: 'text', description: 'text' });
 
 module.exports = mongoose.model('Complaint', complaintSchema);

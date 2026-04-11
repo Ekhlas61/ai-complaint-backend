@@ -9,6 +9,7 @@ const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('./src/models/User');
 
+
 // Importing routes
 const authRoutes = require('./src/routes/authRoutes');
 const complaintRoutes = require('./src/routes/complaintRoutes');
@@ -18,6 +19,7 @@ const debugRoutes = require('./src/routes/debugRoutes');
 const analyticsRoutes = require('./src/routes/analyticsRoutes');
 const organizationRoutes = require('./src/routes/organizationRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
+const aiRoutes = require('./src/routes/aiRoutes');
 
 const app = express();
 
@@ -120,6 +122,7 @@ app.use('/api/debug', debugRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/ai', aiRoutes);
 
 // Test route
 app.get('/', (req, res) => {

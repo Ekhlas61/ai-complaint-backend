@@ -84,8 +84,15 @@ const userSchema = new mongoose.Schema(
 
 
 // Indexes
-
 userSchema.index({ role: 1 });
 userSchema.index({ organization: 1 });
+userSchema.index({ organization: 1, role: 1 }, { 
+  unique: true, 
+  partialFilterExpression: { role: 'OrgAdmin', organization: { $exists: true, $ne: null } }
+});
+userSchema.index({ department: 1, role: 1 }, { 
+  unique: true, 
+  partialFilterExpression: { role: 'DeptAdmin', department: { $exists: true, $ne: null } }
+});
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,15 +1,13 @@
 openapi: 3.0.0
 info:
   title: Smart Complaint Management System API
-  description: |
-    Backend API for the Smart Complaint Management System.
-    Supports citizen self-registration, complaint submission, assignment, status updates, comments, user management, and analytics.
-  version: 2.0.0
+  description: Backend API for the Smart Complaint Management System.
+  version: 3.0.0
 servers:
   - url: https://ai-complaint-backend-7xc5.onrender.com/api
-    description: Production Server (Render)
+    description: Production
   - url: http://localhost:5000/api
-    description: Local Development Server
+    description: Local
 
 components:
   securitySchemes:
@@ -24,278 +22,111 @@ components:
       properties:
         message:
           type: string
-          example: "Invalid token"
-      required:
-        - message
+      required: [message]
 
     User:
       type: object
       properties:
-        _id:
-          type: string
-          example: 67c4a8b9f2e3d4c5e6789012
-        fullName:
-          type: string
-          example: Abebe Kebede
-        email:
-          type: string
-          example: abebe.kebede@example.com
-        role:
-          type: string
-          enum: [Citizen, DeptAdmin, OrgAdmin, SysAdmin]
-          example: Citizen
-        organization:
-          type: object
-          properties:
-            _id:
-              type: string
-            name:
-              type: string
-          nullable: true
-        department:
-          type: object
-          properties:
-            _id:
-              type: string
-            name:
-              type: string
-          nullable: true
-        createdAt:
-          type: string
-          format: date-time
-        lastLogin:
-          type: string
-          format: date-time
-          nullable: true
-        isActive:
-          type: boolean
-          example: true
+        _id: { type: string }
+        fullName: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [Citizen, DeptAdmin, OrgAdmin, SysAdmin] }
+        organization: { type: object, properties: { _id: { type: string }, name: { type: string } }, nullable: true }
+        department: { type: object, properties: { _id: { type: string }, name: { type: string } }, nullable: true }
+        createdAt: { type: string, format: date-time }
+        lastLogin: { type: string, format: date-time, nullable: true }
+        isActive: { type: boolean }
 
     Organization:
       type: object
       properties:
-        _id:
-          type: string
-        name:
-          type: string
-          example: "EEP"
-        code:
-          type: string
-          example: "EEP"
-        isActive:
-          type: boolean
-          default: true
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
+        _id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        isActive: { type: boolean, default: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 
     Department:
       type: object
       properties:
-        _id:
-          type: string
-        name:
-          type: string
-          example: "EEP - Customer Service"
-        code:
-          type: string
-          example: "CS_EEP"
-        description:
-          type: string
-        head:
-          type: string
-          nullable: true
-          description: ObjectId of the DeptAdmin heading this department
-        organization:
-          type: object
-          properties:
-            _id:
-              type: string
-            name:
-              type: string
-        isActive:
-          type: boolean
-          default: true
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
+        _id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        description: { type: string }
+        head: { type: string, nullable: true }
+        organization: { type: object, properties: { _id: { type: string }, name: { type: string } } }
+        isActive: { type: boolean, default: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 
     Complaint:
       type: object
       properties:
-        _id:
-          type: string
-        title:
-          type: string
-          example: "Pothole on Bole Road"
-        description:
-          type: string
-          example: "Large pothole causing traffic accidents"
-        category:
-          type: string
-          example: "Road Infrastructure"
+        _id: { type: string }
+        title: { type: string }
+        description: { type: string }
+        category: { type: string, nullable: true }
+        imagePath: { type: string, nullable: true }
         location:
           type: object
           properties:
-            type:
-              type: string
-              enum: [Point]
-              default: Point
-            coordinates:
-              type: array
-              items:
-                type: number
-              minItems: 2
-              maxItems: 2
-              description: [longitude, latitude]
-            locationName:
-              type: string
-        images:
-          type: array
-          items:
-            type: object
-            properties:
-              path:
-                type: string
-              uploadedAt:
-                type: string
-                format: date-time
-        submittedBy:
-          type: object
-          properties:
-            _id:
-              type: string
-            fullName:
-              type: string
-            email:
-              type: string
-        department:
-          type: object
-          properties:
-            _id:
-              type: string
-            name:
-              type: string
-            code:
-              type: string
-        assignedTo:
-          type: object
-          properties:
-            _id:
-              type: string
-            fullName:
-              type: string
-            email:
-              type: string
+            type: { type: string, enum: [Point], default: Point }
+            coordinates: { type: array, items: { type: number }, minItems: 2, maxItems: 2 }
+            locationName: { type: string }
           nullable: true
-        status:
-          type: string
-          enum: [Submitted, In Progress, Resolved, Rejected]
-          default: Submitted
-        priority:
-          type: string
-          enum: [Low, Medium, High, Critical]
-          default: Medium
+        submittedBy: { type: object, properties: { _id: { type: string }, fullName: { type: string }, email: { type: string } } }
+        department: { type: object, properties: { _id: { type: string }, name: { type: string }, code: { type: string } }, nullable: true }
+        assignedTo: { type: object, properties: { _id: { type: string }, fullName: { type: string }, email: { type: string } }, nullable: true }
+        status: { type: string, enum: [Submitted, 'Manual Review', 'In Progress', Resolved, Rejected], default: Submitted }
+        priority: { type: string, enum: [Low, Medium, High, Critical], default: Medium }
+        isSpam: { type: boolean, default: false }
+        aiConfidence: { type: number, minimum: 0, maximum: 1, nullable: true }
+        duplicateOf: { type: string, nullable: true }
+        overriddenFields: { type: object, additionalProperties: { type: boolean } }
         history:
           type: array
           items:
             type: object
             properties:
-              action:
-                type: string
-              by:
-                type: object
-                properties:
-                  _id:
-                    type: string
-                  fullName:
-                    type: string
-              comment:
-                type: string
-              timestamp:
-                type: string
-                format: date-time
-        resolvedAt:
-          type: string
-          format: date-time
-          nullable: true
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
+              action: { type: string }
+              by: { type: object, properties: { _id: { type: string }, fullName: { type: string } } }
+              comment: { type: string }
+              timestamp: { type: string, format: date-time }
+        resolvedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 
     Comment:
       type: object
       properties:
-        _id:
-          type: string
-        complaint:
-          type: string
-          description: Complaint ID
-        author:
-          type: object
-          properties:
-            _id:
-              type: string
-            fullName:
-              type: string
-            email:
-              type: string
-        commentText:
-          type: string
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
+        _id: { type: string }
+        complaint: { type: string }
+        author: { type: object, properties: { _id: { type: string }, fullName: { type: string }, email: { type: string } } }
+        commentText: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 
     Notification:
       type: object
       properties:
-        _id:
-          type: string
-        user:
-          type: string
-          description: User ID of the recipient
-        type:
-          type: string
-          enum: [COMPLAINT_ASSIGNED, STATUS_UPDATED, COMMENT_ADDED]
-        title:
-          type: string
-        message:
-          type: string
-        data:
-          type: object
-          nullable: true
-        read:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
+        _id: { type: string }
+        user: { type: string }
+        type: { type: string, enum: [COMPLAINT_ASSIGNED, STATUS_UPDATED, COMMENT_ADDED, REVIEW_NEEDED] }
+        title: { type: string }
+        message: { type: string }
+        data: { type: object, nullable: true }
+        read: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 
     AnalyticsSummary:
       type: object
       properties:
-        total:
-          type: integer
-        resolved:
-          type: integer
-        pending:
-          type: integer
-        resolvedPercentage:
-          type: integer
+        total: { type: integer }
+        resolved: { type: integer }
+        pending: { type: integer }
+        resolvedPercentage: { type: integer }
 
     OrgAdminAnalytics:
       type: object
@@ -305,18 +136,12 @@ components:
           items:
             type: object
             properties:
-              departmentId:
-                type: string
-              name:
-                type: string
-              total:
-                type: integer
-              resolved:
-                type: integer
-              pending:
-                type: integer
-              resolvedPercentage:
-                type: integer
+              departmentId: { type: string }
+              name: { type: string }
+              total: { type: integer }
+              resolved: { type: integer }
+              pending: { type: integer }
+              resolvedPercentage: { type: integer }
 
     SysAdminAnalytics:
       type: object
@@ -326,56 +151,25 @@ components:
           items:
             type: object
             properties:
-              organizationId:
-                type: string
-              name:
-                type: string
-              total:
-                type: integer
-              resolved:
-                type: integer
-              pending:
-                type: integer
-              resolvedPercentage:
-                type: integer
+              organizationId: { type: string }
+              name: { type: string }
+              total: { type: integer }
+              resolved: { type: integer }
+              pending: { type: integer }
+              resolvedPercentage: { type: integer }
 
   responses:
-    Unauthorized:
-      description: Unauthorized – invalid or missing token
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    Forbidden:
-      description: Forbidden – insufficient permissions
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    NotFound:
-      description: Resource not found
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    BadRequest:
-      description: Bad request - validation error or missing fields
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
-    ServerError:
-      description: Internal server error
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/Error'
+    Unauthorized: { description: Unauthorized }
+    Forbidden: { description: Forbidden }
+    NotFound: { description: Not found }
+    BadRequest: { description: Bad request }
+    ServerError: { description: Server error }
 
 paths:
   # ========== AUTHENTICATION ==========
   /auth/register:
     post:
-      summary: Register a new citizen user (self-registration)
+      summary: Register citizen
       tags: [Authentication]
       requestBody:
         required: true
@@ -385,38 +179,14 @@ paths:
               type: object
               required: [fullName, email, password]
               properties:
-                fullName:
-                  type: string
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  minLength: 8
-      responses:
-        '201':
-          description: User registered successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  _id:
-                    type: string
-                  fullName:
-                    type: string
-                  email:
-                    type: string
-                  token:
-                    type: string
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                fullName: { type: string }
+                email: { type: string }
+                password: { type: string, minLength: 8 }
+      responses: { '201': { description: Registered }, '400': { $ref: '#/components/responses/BadRequest' } }
 
   /auth/login:
     post:
-      summary: Authenticate user and get JWT
+      summary: Login
       tags: [Authentication]
       requestBody:
         required: true
@@ -426,34 +196,9 @@ paths:
               type: object
               required: [email, password]
               properties:
-                email:
-                  type: string
-                password:
-                  type: string
-      responses:
-        '200':
-          description: Login successful
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  _id:
-                    type: string
-                  role:
-                    type: string
-                  token:
-                    type: string
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: Account deactivated
-        '500':
-          $ref: '#/components/responses/ServerError'
+                email: { type: string }
+                password: { type: string }
+      responses: { '200': { description: Login success }, '401': { $ref: '#/components/responses/Unauthorized' } }
 
   /auth/forgot-password:
     post:
@@ -467,15 +212,8 @@ paths:
               type: object
               required: [email]
               properties:
-                email:
-                  type: string
-      responses:
-        '200':
-          description: Reset link sent
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                email: { type: string }
+      responses: { '200': { description: Reset link sent } }
 
   /auth/reset-password:
     post:
@@ -489,38 +227,14 @@ paths:
               type: object
               required: [token, email, password]
               properties:
-                token:
-                  type: string
-                  description: Reset token received in email
-                email:
-                  type: string
-                  format: email
-                password:
-                  type: string
-                  minLength: 6
-      responses:
-        '200':
-          description: Password reset successful
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Password reset successful. Please login."
-        '400':
-          description: Invalid or expired token
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                token: { type: string }
+                email: { type: string }
+                password: { type: string, minLength: 6 }
+      responses: { '200': { description: Password reset } }
 
   /auth/forgot-password-otp:
     post:
-      summary: Request password reset with OTP
+      summary: Request OTP for password reset
       tags: [Authentication]
       requestBody:
         required: true
@@ -530,24 +244,8 @@ paths:
               type: object
               required: [email]
               properties:
-                email:
-                  type: string
-                  format: email
-      responses:
-        '200':
-          description: OTP sent to email
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "OTP has been sent to your email."
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                email: { type: string }
+      responses: { '200': { description: OTP sent } }
 
   /auth/reset-password-otp:
     post:
@@ -561,62 +259,23 @@ paths:
               type: object
               required: [email, otp, password]
               properties:
-                email:
-                  type: string
-                  format: email
-                otp:
-                  type: string
-                  pattern: '^[0-9]{6}$'
-                  description: 6-digit OTP received in email
-                password:
-                  type: string
-                  minLength: 6
-      responses:
-        '200':
-          description: Password reset successful
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: "Password reset successful. Please login."
-        '400':
-          description: Invalid or expired OTP
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                email: { type: string }
+                otp: { type: string, pattern: '^[0-9]{6}$' }
+                password: { type: string, minLength: 6 }
+      responses: { '200': { description: Password reset } }
 
   /auth/profile:
     get:
-      summary: Get current user's profile
+      summary: Get current user profile
       tags: [Authentication]
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: User profile
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: Profile }, '401': { $ref: '#/components/responses/Unauthorized' } }
 
   /auth/change-password:
     post:
-      summary: Change password (requires current password)
+      summary: Change password
       tags: [Authentication]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -625,27 +284,16 @@ paths:
               type: object
               required: [oldPassword, newPassword]
               properties:
-                oldPassword:
-                  type: string
-                newPassword:
-                  type: string
-      responses:
-        '200':
-          description: Password changed
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                oldPassword: { type: string }
+                newPassword: { type: string }
+      responses: { '200': { description: Changed }, '401': { $ref: '#/components/responses/Unauthorized' } }
 
   # ========== USER MANAGEMENT ==========
   /users/org-admins:
     post:
-      summary: Create a new Organization Admin (SysAdmin only)
+      summary: Create OrgAdmin (SysAdmin)
       tags: [Users]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -654,140 +302,45 @@ paths:
               type: object
               required: [fullName, email, password, organizationId]
               properties:
-                fullName:
-                  type: string
-                email:
-                  type: string
-                password:
-                  type: string
-                organizationId:
-                  type: string
-                  description: ObjectId of the organization
-      responses:
-        '201':
-          description: OrgAdmin created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  _id:
-                    type: string
-                  fullName:
-                    type: string
-                  email:
-                    type: string
-                  role:
-                    type: string
-                  organization:
-                    type: string
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                fullName: { type: string }
+                email: { type: string }
+                password: { type: string }
+                organizationId: { type: string }
+      responses: { '201': { description: Created }, '403': { $ref: '#/components/responses/Forbidden' } }
     get:
-      summary: List all Organization Admins (SysAdmin only)
+      summary: List OrgAdmins (SysAdmin)
       tags: [Users]
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of OrgAdmins
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: List of OrgAdmins } }
 
   /users/org-admins/{id}:
     put:
-      summary: Update an Organization Admin (SysAdmin only)
+      summary: Update OrgAdmin (SysAdmin)
       tags: [Users]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+      security: [{ bearerAuth: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               type: object
               properties:
-                fullName:
-                  type: string
-                email:
-                  type: string
-      responses:
-        '200':
-          description: OrgAdmin updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
+                fullName: { type: string }
+                email: { type: string }
+      responses: { '200': { description: Updated } }
   /users/org-admins/{id}/deactivate:
     put:
-      summary: Deactivate an Organization Admin (SysAdmin only)
+      summary: Deactivate OrgAdmin (SysAdmin)
       tags: [Users]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: OrgAdmin deactivated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
+      security: [{ bearerAuth: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { description: Deactivated } }
 
   /users/dept-admins:
     post:
-      summary: Create a new Department Admin (OrgAdmin only)
+      summary: Create DeptAdmin (OrgAdmin)
       tags: [Users]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -796,144 +349,47 @@ paths:
               type: object
               required: [fullName, email, password, departmentId]
               properties:
-                fullName:
-                  type: string
-                email:
-                  type: string
-                password:
-                  type: string
-                departmentId:
-                  type: string
-      responses:
-        '201':
-          description: DeptAdmin created
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  _id:
-                    type: string
-                  fullName:
-                    type: string
-                  email:
-                    type: string
-                  role:
-                    type: string
-                  department:
-                    type: string
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                fullName: { type: string }
+                email: { type: string }
+                password: { type: string }
+                departmentId: { type: string }
+      responses: { '201': { description: Created } }
     get:
-      summary: List all Department Admins in the OrgAdmin's organization (OrgAdmin only)
+      summary: List DeptAdmins (OrgAdmin)
       tags: [Users]
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of DeptAdmins
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/User'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: List } }
 
   /users/dept-admins/{id}:
     put:
-      summary: Update a Department Admin (OrgAdmin only)
+      summary: Update DeptAdmin (OrgAdmin)
       tags: [Users]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+      security: [{ bearerAuth: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
       requestBody:
-        required: true
         content:
           application/json:
             schema:
               type: object
               properties:
-                fullName:
-                  type: string
-                email:
-                  type: string
-                departmentId:
-                  type: string
-      responses:
-        '200':
-          description: DeptAdmin updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/User'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
+                fullName: { type: string }
+                email: { type: string }
+                departmentId: { type: string }
+      responses: { '200': { description: Updated } }
   /users/dept-admins/{id}/deactivate:
     put:
-      summary: Deactivate a Department Admin (OrgAdmin only)
+      summary: Deactivate DeptAdmin (OrgAdmin)
       tags: [Users]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: DeptAdmin deactivated
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
+      security: [{ bearerAuth: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { description: Deactivated } }
 
   # ========== ORGANIZATIONS ==========
   /organizations:
     post:
-      summary: Create a new organization (SysAdmin only)
+      summary: Create organization (SysAdmin)
       tags: [Organizations]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -942,294 +398,150 @@ paths:
               type: object
               required: [name, code]
               properties:
-                name:
-                  type: string
-                code:
-                  type: string
-      responses:
-        '201':
-          description: Organization created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Organization'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                name: { type: string }
+                code: { type: string }
+      responses: { '201': { description: Created } }
     get:
-      summary: List all active organizations (SysAdmin only)
+      summary: List organizations (SysAdmin)
       tags: [Organizations]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: List } }
+
+  /organizations/citizen-list:
+    get:
+      summary: List organizations for citizens
+      tags: [Organizations]
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: List of organizations
+          description: List of { _id, name }
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Organization'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                  type: object
+                  properties:
+                    _id: { type: string }
+                    name: { type: string }
 
   /organizations/{id}:
     put:
-      summary: Update organization (SysAdmin only)
+      summary: Update organization (SysAdmin)
       tags: [Organizations]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+      security: [{ bearerAuth: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
       requestBody:
         content:
           application/json:
             schema:
               type: object
               properties:
-                name:
-                  type: string
-                code:
-                  type: string
-                isActive:
-                  type: boolean
-      responses:
-        '200':
-          description: Organization updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Organization'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
+                name: { type: string }
+                code: { type: string }
+                isActive: { type: boolean }
+      responses: { '200': { description: Updated } }
   /organizations/{id}/deactivate:
     put:
-      summary: Deactivate organization (SysAdmin only)
+      summary: Deactivate organization (SysAdmin)
       tags: [Organizations]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
+      security: [{ bearerAuth: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { description: Deactivated } }
+
+  # ========== DEPARTMENTS ==========
+  /departments:
+    post:
+      summary: Create department (OrgAdmin)
+      tags: [Departments]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, code]
+              properties:
+                name: { type: string }
+                code: { type: string }
+                description: { type: string }
+      responses: { '201': { description: Created } }
+    get:
+      summary: List departments (OrgAdmin)
+      tags: [Departments]
+      security: [{ bearerAuth: [] }]
+      responses: { '200': { description: List } }
+
+  /departments/{id}:
+    put:
+      summary: Update department (OrgAdmin)
+      tags: [Departments]
+      security: [{ bearerAuth: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                code: { type: string }
+                description: { type: string }
+      responses: { '200': { description: Updated } }
+  /departments/{id}/deactivate:
+    put:
+      summary: Deactivate department (OrgAdmin)
+      tags: [Departments]
+      security: [{ bearerAuth: [] }]
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { '200': { description: Deactivated } }
+
+  # ========== COMPLAINTS ==========
+  /complaints:
+    post:
+      summary: Submit a complaint (Citizen)
+      tags: [Complaints]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, organizationId]
+              properties:
+                title: { type: string }
+                description: { type: string }
+                imagePath: { type: string, nullable: true }
+                latitude: { type: number, format: float, nullable: true }
+                longitude: { type: number, format: float, nullable: true }
+                organizationId: { type: string }
       responses:
-        '200':
-          description: Organization deactivated
+        '201':
+          description: Complaint submitted (AI async)
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  message:
-                    type: string
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
-  # ========== DEPARTMENTS ==========
-  /departments:
-    post:
-      summary: Create new department (OrgAdmin only)
-      tags: [Departments]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name, code]
-              properties:
-                name:
-                  type: string
-                code:
-                  type: string
-                description:
-                  type: string
-      responses:
-        '201':
-          description: Department created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Department'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
-    get:
-      summary: List all active departments (OrgAdmin only)
-      tags: [Departments]
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: List of departments
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Department'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
-  /departments/{id}:
-    put:
-      summary: Update department (OrgAdmin only)
-      tags: [Departments]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name:
-                  type: string
-                code:
-                  type: string
-                description:
-                  type: string
-      responses:
-        '200':
-          description: Department updated
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Department'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
-  /departments/{id}/deactivate:
-    put:
-      summary: Deactivate department (OrgAdmin only)
-      tags: [Departments]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Department deactivated
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
-  # ========== COMPLAINTS ==========
-  /complaints:
-    post:
-      summary: Submit a new complaint (Citizen only)
-      tags: [Complaints]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [title, description, category, department]
-              properties:
-                title:
-                  type: string
-                description:
-                  type: string
-                category:
-                  type: string
-                location:
-                  type: object
-                priority:
-                  type: string
-                  enum: [Low, Medium, High, Critical]
-                department:
-                  type: string
-      responses:
-        '201':
-          description: Complaint submitted
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Complaint'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                  success: { type: boolean }
+                  complaint:
+                    type: object
+                    properties:
+                      id: { type: string }
+                      title: { type: string }
+                      description: { type: string }
+                      status: { type: string }
+                      createdAt: { type: string, format: date-time }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /complaints/my-complaints:
     get:
-      summary: Get complaints submitted by the logged-in citizen
+      summary: Get citizen's complaints
       tags: [Complaints]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
           description: List of complaints
@@ -1239,163 +551,140 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Complaint'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
 
   /complaints/assigned:
     get:
-      summary: Get complaints assigned to the logged-in DeptAdmin (with summary stats)
+      summary: Get complaints assigned to DeptAdmin
       tags: [Complaints]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       parameters:
         - name: status
           in: query
           schema:
             type: string
-            enum: [Submitted, In Progress, Resolved, Rejected]
+            enum: [Submitted, 'Manual Review', 'In Progress', Resolved, Rejected]
       responses:
         '200':
-          description: Assigned complaints with stats
+          description: List of assigned complaints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Complaint'
+
+  /complaints/organization:
+    get:
+      summary: Get all complaints in organization (OrgAdmin)
+      tags: [Complaints]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Submitted, 'Manual Review', 'In Progress', Resolved, Rejected]
+      responses:
+        '200':
+          description: List of complaints in organization
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Complaint'
+
+  /complaints/{id}/status:
+    put:
+      summary: Update complaint status (DeptAdmin)
+      tags: [Complaints]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status: { type: string, enum: [Submitted, 'Manual Review', 'In Progress', Resolved, Rejected] }
+                comment: { type: string }
+      responses: { '200': { description: Updated }, '403': { $ref: '#/components/responses/Forbidden' } }
+
+  /complaints/{id}/override:
+    put:
+      summary: Override AI assignment (OrgAdmin)
+      tags: [Complaints]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                department: { type: string }
+                priority: { type: string, enum: [Low, Medium, High, Critical] }
+                status: { type: string, enum: [Submitted, 'Manual Review', 'In Progress', Resolved, Rejected] }
+                isSpam: { type: boolean }
+                duplicateOf: { type: string }
+                comment: { type: string }
+      responses: { '200': { description: Override successful }, '403': { $ref: '#/components/responses/Forbidden' } }
+
+  
+  /ai/moderate:
+    post:
+      summary: Run AI moderation on a complaint
+      tags: [AI]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [complaintId]
+              properties:
+                complaintId: { type: string }
+      responses:
+        '200':
+          description: AI moderation completed
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  summary:
-                    $ref: '#/components/schemas/AnalyticsSummary'
-                  data:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Complaint'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
-  /complaints/{id}/status:
-    put:
-      summary: Update complaint status  (DeptAdmin only)
-      tags: [Complaints]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                status:
-                  type: string
-                  enum: [Submitted, In Progress, Resolved, Rejected]
-                comment:
-                  type: string
-      responses:
-        '200':
-          description: Status updated
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
-  /complaints/{id}/assign:
-    put:
-      summary: Assign complaint to a department or DeptAdmin (OrgAdmin/SysAdmin only)
-      tags: [Complaints]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                assignedTo:
-                  type: string
-                department:
-                  type: string
-                note:
-                  type: string
-      responses:
-        '200':
-          description: Complaint assigned
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
-
-  /complaints/{id}:
-    get:
-      summary: Get a single complaint by ID (role‑based access)
-      tags: [Complaints]
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Complaint details
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Complaint'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                  success: { type: boolean }
+                  aiResult:
+                    type: object
+                    properties:
+                      isSpam: { type: boolean }
+                      priority: { type: string, enum: [Low, Medium, High, Critical] }
+                      department: { type: string, nullable: true }
+                      duplicateOf: { type: string, nullable: true }
+                      aiConfidence: { type: number }
+                  finalStatus: { type: string, enum: [Submitted, 'Manual Review', Rejected] }
+                  assignedDepartmentId: { type: string, nullable: true }
+                  duplicateFound: { type: boolean }
 
   /complaints/{id}/comments:
     post:
-      summary: Add a comment to a complaint (authorized users only)
+      summary: Add a comment (DeptAdmin or OrgAdmin)
       tags: [Comments]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       parameters:
         - name: id
           in: path
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       requestBody:
         required: true
         content:
@@ -1404,8 +693,7 @@ paths:
               type: object
               required: [commentText]
               properties:
-                commentText:
-                  type: string
+                commentText: { type: string }
       responses:
         '201':
           description: Comment added
@@ -1413,27 +701,15 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Comment'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
     get:
-      summary: Get all comments for a complaint (authorized users only)
+      summary: Get comments (DeptAdmin or OrgAdmin)
       tags: [Comments]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       parameters:
         - name: id
           in: path
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
         '200':
           description: List of comments
@@ -1443,22 +719,13 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Comment'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
 
   # ========== NOTIFICATIONS ==========
   /notifications:
     get:
-      summary: Get current user's notifications (authenticated users only)
+      summary: Get user notifications
       tags: [Notifications]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
           description: List of notifications
@@ -1468,135 +735,89 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Notification'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
 
   /notifications/{id}/read:
     put:
-      summary: Mark a single notification as read
+      summary: Mark notification as read
       tags: [Notifications]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       parameters:
         - name: id
           in: path
           required: true
-          schema:
-            type: string
+          schema: { type: string }
       responses:
         '200':
-          description: Notification marked as read
+          description: Marked as read
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Notification'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '500':
-          $ref: '#/components/responses/ServerError'
 
   /notifications/read-all:
     put:
-      summary: Mark all notifications as read for the current user
+      summary: Mark all notifications as read
       tags: [Notifications]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: All notifications marked as read
+          description: All marked read
           content:
             application/json:
               schema:
                 type: object
                 properties:
-                  message:
-                    type: string
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '500':
-          $ref: '#/components/responses/ServerError'
+                  message: { type: string }
 
   # ========== ANALYTICS ==========
   /analytics/dept-admin:
     get:
-      summary: Get dashboard statistics for the logged-in DeptAdmin
+      summary: DeptAdmin dashboard stats
       tags: [Analytics]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: DeptAdmin analytics
+          description: Summary stats
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalyticsSummary'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
 
   /analytics/org-admin:
     get:
-      summary: Get dashboard statistics for the logged-in OrgAdmin
+      summary: OrgAdmin dashboard stats by department
       tags: [Analytics]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: OrgAdmin analytics (departments)
+          description: Department breakdown
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/OrgAdminAnalytics'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
 
   /analytics/sys-admin:
     get:
-      summary: Get dashboard statistics for SysAdmin
+      summary: SysAdmin dashboard stats by organization
       tags: [Analytics]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: SysAdmin analytics (organizations)
+          description: Organization breakdown
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SysAdminAnalytics'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'
 
   /analytics/citizen:
     get:
-      summary: Get dashboard statistics for the logged-in citizen
+      summary: Citizen dashboard stats
       tags: [Analytics]
-      security:
-        - bearerAuth: []
+      security: [{ bearerAuth: [] }]
       responses:
         '200':
-          description: Citizen analytics
+          description: Summary stats
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalyticsSummary'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '500':
-          $ref: '#/components/responses/ServerError'

@@ -28,6 +28,19 @@ exports.getOrganizations = async (req, res) => {
   }
 };
 
+// List active organizations (Citizen only)
+exports.getOrganizationsForCitizen = async (req, res) => {
+  try {
+    const organizations = await Organization.find({ isActive: true })
+      .select('_id name')
+      .sort({ name: 1 });
+    res.json(organizations);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
 // Update organization (SysAdmin only)
 exports.updateOrganization = async (req, res) => {
   try {
@@ -58,3 +71,4 @@ exports.deactivateOrganization = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+

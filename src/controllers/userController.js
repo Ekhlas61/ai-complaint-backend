@@ -3,6 +3,22 @@ const Department = require('../models/Department');
 const Organization = require('../models/Organization');
 const bcrypt = require('bcryptjs');
 
+// Check for existing active OrgAdmin 
+async function hasActiveOrgAdmin(organizationId, excludeUserId = null) {
+  const query = { role: 'OrgAdmin', organization: organizationId, isActive: true };
+  if (excludeUserId) query._id = { $ne: excludeUserId };
+  const existing = await User.findOne(query);
+  return !!existing;
+}
+
+// Check for existing active DeptAdmin 
+async function hasActiveDeptAdmin(departmentId, excludeUserId = null) {
+  const query = { role: 'DeptAdmin', department: departmentId, isActive: true };
+  if (excludeUserId) query._id = { $ne: excludeUserId };
+  const existing = await User.findOne(query);
+  return !!existing;
+}
+
 // ========== ORGADMIN MANAGEMENT (SysAdmin only) ==========
 
 // Create OrgAdmin
@@ -13,6 +29,12 @@ exports.createOrgAdmin = async (req, res) => {
     const organization = await Organization.findById(organizationId);
     if (!organization) {
       return res.status(400).json({ message: 'Invalid organization ID' });
+    }
+
+    // Check if an active OrgAdmin already exists for this organization
+    const hasActive = await hasActiveOrgAdmin(organizationId);
+    if (hasActive) {
+      return res.status(400).json({ message: 'This organization already has an active OrgAdmin. Deactivate the existing one first.' });
     }
 
     const existing = await User.findOne({ email });
@@ -57,12 +79,24 @@ exports.getOrgAdmins = async (req, res) => {
 exports.updateOrgAdmin = async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullName, email } = req.body;
+    const { fullName, email, isActive } = req.body; // allow toggling active status
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ message: 'User not found' });
     if (user.role !== 'OrgAdmin') {
       return res.status(400).json({ message: 'User is not an OrgAdmin' });
+    }
+
+    // If toggling active status, ensure uniqueness
+    if (isActive !== undefined && isActive === true && !user.isActive) {
+      // Reactivating – check no other active OrgAdmin for the same organization
+      const hasActive = await hasActiveOrgAdmin(user.organization, user._id);
+      if (hasActive) {
+        return res.status(400).json({ message: 'Cannot reactivate: Another active OrgAdmin already exists for this organization.' });
+      }
+      user.isActive = true;
+    } else if (isActive !== undefined && isActive === false && user.isActive) {
+      user.isActive = false;
     }
 
     if (fullName) user.fullName = fullName;
@@ -117,6 +151,12 @@ exports.createDeptAdmin = async (req, res) => {
       return res.status(403).json({ message: 'You can only create DeptAdmin for your own organization' });
     }
 
+    // Check if an active DeptAdmin already exists for this department
+    const hasActive = await hasActiveDeptAdmin(departmentId);
+    if (hasActive) {
+      return res.status(400).json({ message: 'This department already has an active DeptAdmin. Deactivate the existing one first.' });
+    }
+
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: 'Email already in use' });
 
@@ -169,7 +209,7 @@ exports.getDeptAdmins = async (req, res) => {
 exports.updateDeptAdmin = async (req, res) => {
   try {
     const { id } = req.params;
-    const { fullName, email, departmentId } = req.body;
+    const { fullName, email, departmentId, isActive } = req.body;
 
     const user = await User.findById(id);
     if (!user) return res.status(404).json({ message: 'User not found' });
@@ -180,10 +220,8 @@ exports.updateDeptAdmin = async (req, res) => {
       return res.status(403).json({ message: 'You can only update DeptAdmins in your own organization' });
     }
 
-    if (fullName) user.fullName = fullName;
-    if (email) user.email = email;
-
-    if (departmentId) {
+    // If changing department
+    if (departmentId && departmentId !== user.department?.toString()) {
       // Validate new department
       const newDept = await Department.findById(departmentId);
       if (!newDept) return res.status(400).json({ message: 'Department not found' });
@@ -191,14 +229,44 @@ exports.updateDeptAdmin = async (req, res) => {
         return res.status(403).json({ message: 'Department must belong to your organization' });
       }
 
-      // Remove head from old department if the user had one
+      // Check if target department already has an active DeptAdmin (excluding this user)
+      const hasActive = await hasActiveDeptAdmin(departmentId, user._id);
+      if (hasActive) {
+        return res.status(400).json({ message: 'The target department already has an active DeptAdmin. Deactivate that admin first.' });
+      }
+
+      // Remove head from old department if the user was head
       if (user.department) {
         await Department.findByIdAndUpdate(user.department, { head: null });
       }
 
-      // Update user's department and set new department head
       user.department = newDept._id;
       await Department.findByIdAndUpdate(newDept._id, { head: user._id });
+    }
+
+    if (fullName) user.fullName = fullName;
+    if (email) user.email = email;
+
+    // If toggling active status
+    if (isActive !== undefined) {
+      if (isActive === true && !user.isActive) {
+        // Reactivating – check no other active DeptAdmin for the current department
+        const hasActive = await hasActiveDeptAdmin(user.department, user._id);
+        if (hasActive) {
+          return res.status(400).json({ message: 'Cannot reactivate: Another active DeptAdmin already exists for this department.' });
+        }
+        user.isActive = true;
+        // Set as head again
+        if (user.department) {
+          await Department.findByIdAndUpdate(user.department, { head: user._id });
+        }
+      } else if (isActive === false && user.isActive) {
+        user.isActive = false;
+        // Remove as head
+        if (user.department) {
+          await Department.findByIdAndUpdate(user.department, { head: null });
+        }
+      }
     }
 
     await user.save();
@@ -234,7 +302,7 @@ exports.deactivateDeptAdmin = async (req, res) => {
     user.isActive = false;
     await user.save();
 
-    // Remove this user as head of department if they were the head
+    // Remove this user as head of department
     if (user.department) {
       await Department.findByIdAndUpdate(user.department, { head: null });
     }
@@ -244,4 +312,3 @@ exports.deactivateDeptAdmin = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-

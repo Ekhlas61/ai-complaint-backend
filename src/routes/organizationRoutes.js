@@ -7,9 +7,13 @@ const {
   getOrganizations,
   updateOrganization,
   deactivateOrganization,
+  getOrganizationsForCitizen,
 } = require('../controllers/organizationController');
 
-// All routes require SysAdmin role
+// Citizen route 
+router.get('/citizen-list', protect, authorizeRoles('Citizen'), getOrganizationsForCitizen);
+
+// SysAdmin-only routes
 router.use(protect);
 router.use(authorizeRoles('SysAdmin'));
 

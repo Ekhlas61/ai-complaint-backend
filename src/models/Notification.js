@@ -13,6 +13,7 @@ const notificationSchema = new mongoose.Schema({
       'COMPLAINT_ASSIGNED',
       'STATUS_UPDATED',
       'COMMENT_ADDED',
+      'REVIEW_NEEDED',
     ],
     required: true,
   },

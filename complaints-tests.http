@@ -1,0 +1,315 @@
+### ========== COMPLAINT ENDPOINTS TESTS ==========
+@baseUrl = http://localhost:5000/api
+
+### ------------------------------------------------------------
+### 1. PRE-REQUISITES – Set variables (REPLACE these with real values)
+### ------------------------------------------------------------
+@citizenToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ZDRiYjA3ZDkxYzgwM2I2MjlhMWY4ZiIsInJvbGUiOiJDaXRpemVuIiwiaWF0IjoxNzc1NTQ5NTM5LCJleHAiOjE3NzYxNTQzMzl9.V9S9XzJ2ze1RxNBzglc-hMkzp9yxGRhTNgDvusnzPTI
+@deptAdminToken = YOUR_DEPT_ADMIN_TOKEN_HERE
+@orgAdminToken = YOUR_ORG_ADMIN_TOKEN_HERE
+@sysAdminToken = YOUR_SYS_ADMIN_TOKEN_HERE
+@organizationId = ORG_ID_HERE (e.g., from an existing organization)
+@departmentId = DEPT_ID_HERE (existing department)
+@deptAdminUserId = DEPT_ADMIN_USER_ID_HERE (valid DeptAdmin _id)
+@complaintId = COMPLAINT_ID_HERE (will be set after creation)
+
+### ============================================================
+### HAPPY PATH TESTS (Citizen submits complaint)
+### ============================================================
+
+### TC-COMP-01: Submit complaint with only required fields
+# @name createComplaint
+POST {{baseUrl}}/complaints
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "title": "Pothole on Bole Road",
+  "description": "Large pothole causing traffic accidents near the airport.",
+  "organization": "{{organizationId}}"
+}
+
+### Extract complaint ID from response for later tests
+@complaintId = {{createComplaint.response.body._id}}
+
+### TC-COMP-02: Submit complaint with optional priority = High
+POST {{baseUrl}}/complaints
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "title": "Power outage in Bole",
+  "description": "No electricity for 6 hours",
+  "organization": "{{organizationId}}",
+  "priority": "High"
+}
+
+### TC-COMP-09: Get my complaints (Citizen)
+GET {{baseUrl}}/complaints/my-complaints
+Authorization: Bearer {{citizenToken}}
+
+### TC-COMP-11: Citizen views their own complaint (use ID from creation)
+GET {{baseUrl}}/complaints/{{complaintId}}
+Authorization: Bearer {{citizenToken}}
+
+### ============================================================
+### NEGATIVE / VALIDATION TESTS
+### ============================================================
+
+### TC-COMP-03: Missing required field 'organization'
+POST {{baseUrl}}/complaints
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "title": "No organization",
+  "description": "This should fail"
+}
+
+### TC-COMP-04: Missing 'title' (Mongoose required field – expect 500)
+POST {{baseUrl}}/complaints
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "description": "Missing title",
+  "organization": "{{organizationId}}"
+}
+
+### TC-COMP-16: Get non-existent complaint (valid ObjectId but not in DB)
+GET {{baseUrl}}/complaints/67c4a8b9f2e3d4c5e6789999
+Authorization: Bearer {{citizenToken}}
+
+### TC-COMP-15: Invalid complaint ID format (cast error)
+GET {{baseUrl}}/complaints/invalid_id_123
+Authorization: Bearer {{citizenToken}}
+
+### TC-COMP-21: Update status with invalid value
+PUT {{baseUrl}}/complaints/{{complaintId}}/status
+Authorization: Bearer {{deptAdminToken}}
+Content-Type: application/json
+
+{
+  "status": "Closed"
+}
+
+### ============================================================
+### AUTHORIZATION & SECURITY TESTS
+### ============================================================
+
+### TC-COMP-05: No token on submit complaint
+POST {{baseUrl}}/complaints
+Content-Type: application/json
+
+{
+  "title": "No token",
+  "description": "Should be unauthorized",
+  "organization": "{{organizationId}}"
+}
+
+### TC-COMP-06: DeptAdmin tries to submit complaint (should be forbidden)
+POST {{baseUrl}}/complaints
+Authorization: Bearer {{deptAdminToken}}
+Content-Type: application/json
+
+{
+  "title": "DeptAdmin trying to submit",
+  "description": "Should be 403",
+  "organization": "{{organizationId}}"
+}
+
+### TC-COMP-10: DeptAdmin tries to access my-complaints endpoint (Citizen only)
+GET {{baseUrl}}/complaints/my-complaints
+Authorization: Bearer {{deptAdminToken}}
+
+### TC-COMP-12: Citizen tries to view another citizen's complaint
+# Create a second citizen account first, then use its complaint ID
+GET {{baseUrl}}/complaints/ANOTHER_CITIZEN_COMPLAINT_ID
+Authorization: Bearer {{citizenToken}}
+
+### TC-COMP-14: DeptAdmin views complaint not assigned to them
+# Use a complaint assigned to a different DeptAdmin
+GET {{baseUrl}}/complaints/OTHER_DEPTADMIN_COMPLAINT_ID
+Authorization: Bearer {{deptAdminToken}}
+
+### TC-COMP-18: Citizen tries to access assigned complaints endpoint
+GET {{baseUrl}}/complaints/assigned
+Authorization: Bearer {{citizenToken}}
+
+### TC-COMP-22: DeptAdmin tries to update complaint not assigned to them
+PUT {{baseUrl}}/complaints/OTHER_DEPTADMIN_COMPLAINT_ID/status
+Authorization: Bearer {{deptAdminToken}}
+Content-Type: application/json
+
+{
+  "status": "In Progress"
+}
+
+### TC-COMP-23: No token on status update
+PUT {{baseUrl}}/complaints/{{complaintId}}/status
+Content-Type: application/json
+
+{
+  "status": "In Progress"
+}
+
+### TC-COMP-26: DeptAdmin tries to assign complaint (only OrgAdmin/SysAdmin)
+PUT {{baseUrl}}/complaints/{{complaintId}}/assign
+Authorization: Bearer {{deptAdminToken}}
+Content-Type: application/json
+
+{
+  "department": "{{departmentId}}"
+}
+
+### TC-COMP-30: Citizen comments on complaint they don't own
+POST {{baseUrl}}/complaints/OTHER_CITIZEN_COMPLAINT_ID/comments
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "commentText": "Trying to comment on someone else's complaint"
+}
+
+### TC-COMP-32: User without access views comments
+GET {{baseUrl}}/complaints/OTHER_CITIZEN_COMPLAINT_ID/comments
+Authorization: Bearer {{citizenToken}}
+
+### TC-COMP-35: DeptAdmin tries to override complaint
+PUT {{baseUrl}}/complaints/{{complaintId}}/override
+Authorization: Bearer {{deptAdminToken}}
+Content-Type: application/json
+
+{
+  "priority": "Critical"
+}
+
+### TC-COMP-38: Citizen tries to run AI moderation
+POST {{baseUrl}}/complaints/moderate
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "complaintId": "{{complaintId}}"
+}
+
+### ============================================================
+### ASSIGN COMPLAINT (OrgAdmin/SysAdmin only)
+### ============================================================
+
+### TC-COMP-24: Assign complaint to a department
+PUT {{baseUrl}}/complaints/{{complaintId}}/assign
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{
+  "department": "{{departmentId}}",
+  "note": "Forward to water department"
+}
+
+### TC-COMP-25: Assign complaint to a specific DeptAdmin
+PUT {{baseUrl}}/complaints/{{complaintId}}/assign
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{
+  "assignedTo": "{{deptAdminUserId}}",
+  "note": "Assign to John Doe"
+}
+
+### ============================================================
+### DEPTADMIN: GET ASSIGNED COMPLAINTS & UPDATE STATUS
+### ============================================================
+
+### TC-COMP-17: Get assigned complaints (with optional status filter)
+GET {{baseUrl}}/complaints/assigned?status=Submitted
+Authorization: Bearer {{deptAdminToken}}
+
+### TC-COMP-19: Update status to In Progress with comment
+PUT {{baseUrl}}/complaints/{{complaintId}}/status
+Authorization: Bearer {{deptAdminToken}}
+Content-Type: application/json
+
+{
+  "status": "In Progress",
+  "comment": "Investigating the issue"
+}
+
+### TC-COMP-20: Resolve complaint (sets resolvedAt)
+PUT {{baseUrl}}/complaints/{{complaintId}}/status
+Authorization: Bearer {{deptAdminToken}}
+Content-Type: application/json
+
+{
+  "status": "Resolved",
+  "comment": "Issue fixed"
+}
+
+### ============================================================
+### COMMENTS
+### ============================================================
+
+### TC-COMP-28: Add comment to complaint (as owner/assigned/admin)
+POST {{baseUrl}}/complaints/{{complaintId}}/comments
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "commentText": "Please update me on progress."
+}
+
+### TC-COMP-29: Add comment with missing commentText
+POST {{baseUrl}}/complaints/{{complaintId}}/comments
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{}
+
+### TC-COMP-31: Get all comments for a complaint
+GET {{baseUrl}}/complaints/{{complaintId}}/comments
+Authorization: Bearer {{citizenToken}}
+
+### ============================================================
+### ADMIN OVERRIDE (SysAdmin or OrgAdmin)
+### ============================================================
+
+### TC-COMP-33: Full override (department, priority, status)
+PUT {{baseUrl}}/complaints/{{complaintId}}/override
+Authorization: Bearer {{sysAdminToken}}
+Content-Type: application/json
+
+{
+  "department": "{{departmentId}}",
+  "priority": "Critical",
+  "status": "In Progress",
+  "comment": "Urgent reassign due to public safety"
+}
+
+### TC-COMP-34: Override with only one field
+PUT {{baseUrl}}/complaints/{{complaintId}}/override
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{
+  "priority": "High"
+}
+
+### ============================================================
+### AI MODERATION (Admin only)
+### ============================================================
+
+### TC-COMP-36: Run AI moderation on a complaint
+POST {{baseUrl}}/complaints/moderate
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{
+  "complaintId": "{{complaintId}}"
+}
+
+### TC-COMP-37: Missing complaintId in moderate request
+POST {{baseUrl}}/complaints/moderate
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{}

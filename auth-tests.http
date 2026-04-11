@@ -1,0 +1,146 @@
+### ========== AUTHENTICATION TESTS ==========
+@baseUrl = http://localhost:5000/api
+
+### 1. Register User - Happy Path (TC-HP-01)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "bety",
+  "email": "simonjudi93@gmail.com",
+  "password": "bety@1234"
+}
+
+### 2. Register - Missing fullName (TC-NV-01)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "email": "missingname@example.com",
+  "password": "pass123"
+}
+
+### 3. Register - Duplicate Email (TC-NV-02)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Duplicate User",
+  "email": "testcitizen@example.com",
+  "password": "AnotherPass"
+}
+
+### 4. Register - Very long fullName (500 chars) (TC-ED-01)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "email": "longname@example.com",
+  "password": "pass123"
+}
+
+### 5. Login - Valid credentials (TC-HP-02)
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "simonjudi93@gmail.com",
+  "password": "bety@1234"
+}
+
+### 6. Login - Wrong password (TC-NV-03)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "testcitizen@example.com",
+  "password": "WrongPass"
+}
+
+### 7. Login - Missing password (TC-NV-01 variant)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "testcitizen@example.com"
+}
+
+### 8. Get Profile - Valid token (TC-HP-03)
+# Copy token from login response (without quotes) and paste below
+@authToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5ZDRiYjA3ZDkxYzgwM2I2MjlhMWY4ZiIsInJvbGUiOiJDaXRpemVuIiwiaWF0IjoxNzc1NTQ5MTkyLCJleHAiOjE3NzYxNTM5OTJ9.7NCnrAsParpwe17acQ-IoQLB_Tg1zS0DZaCcxGwaFhA
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{authToken}}
+
+### 9. Get Profile - No token (TC-AZ-01)
+GET {{baseUrl}}/auth/profile
+
+### 10. Get Profile - Invalid token (TC-AZ-02)
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer invalid.token.here
+
+### 11. Change Password - Valid (TC-HP-04)
+POST {{baseUrl}}/auth/change-password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "oldPassword": "Test@1234",
+  "newPassword": "NewPass@5678"
+}
+
+### 12. Change Password - Wrong old password (TC-NV-06)
+POST {{baseUrl}}/auth/change-password
+Content-Type: application/json
+Authorization: Bearer {{authToken}}
+
+{
+  "oldPassword": "WrongOld",
+  "newPassword": "NewPass@5678"
+}
+
+### 13. Forgot Password - Existing email (TC-HP-05)
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "testcitizen@example.com"
+}
+
+### 14. Forgot Password - Non-existent email (should still return 200) (TC-NV-09)
+POST {{baseUrl}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "nonexistent@example.com"
+}
+
+### 15. Forgot Password OTP - Existing email (TC-OTP-01)
+POST {{baseUrl}}/auth/forgot-password-otp
+Content-Type: application/json
+
+{
+  "email": "testcitizen@example.com"
+}
+
+### 16. Reset Password with OTP - Valid (TC-OTP-02)
+# Use OTP from console/email (or previewUrl)
+POST {{baseUrl}}/auth/reset-password-otp
+Content-Type: application/json
+
+{
+  "email": "testcitizen@example.com",
+  "otp": "123456",
+  "password": "FinalPass@123"
+}
+
+### 17. Reset Password with OTP - Invalid OTP (TC-OTP-03)
+POST {{baseUrl}}/auth/reset-password-otp
+Content-Type: application/json
+
+{
+  "email": "testcitizen@example.com",
+  "otp": "000000",
+  "password": "AnyPass"
+}
