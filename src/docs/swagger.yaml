@@ -288,10 +288,161 @@ paths:
                 newPassword: { type: string }
       responses: { '200': { description: Changed }, '401': { $ref: '#/components/responses/Unauthorized' } }
 
+  # ========== FILE UPLOADS ==========
+  /uploads/single:
+    post:
+      summary: Upload a single file
+      tags: [File Upload]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file to upload
+                folder:
+                  type: string
+                  description: Optional folder in S3
+              required: [file]
+      responses:
+        '200':
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string, example: File uploaded successfully }
+                  file:
+                    type: object
+                    properties:
+                      url: { type: string }
+                      key: { type: string }
+                      originalName: { type: string }
+                      size: { type: integer }
+                      mimetype: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /uploads/multiple:
+    post:
+      summary: Upload multiple files
+      tags: [File Upload]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: The files to upload (max 5)
+                folder:
+                  type: string
+                  description: Optional folder in S3
+              required: [files]
+      responses:
+        '200':
+          description: Files uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        url: { type: string }
+                        key: { type: string }
+                        originalName: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /uploads/complaint-images:
+    post:
+      summary: Upload complaint images
+      tags: [File Upload]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                  description: The images to upload (max 5)
+                complaintId:
+                  type: string
+                  description: ID of the complaint
+              required: [images]
+      responses:
+        '200':
+          description: Complaint images uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message: { type: string }
+                  images:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        url: { type: string }
+                        key: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
+  /uploads:
+    delete:
+      summary: Delete a file from S3
+      tags: [File Upload]
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileKey]
+              properties:
+                fileKey: { type: string, description: S3 key of the file to delete }
+      responses:
+        '200': { description: File deleted successfully }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+
   # ========== USER MANAGEMENT ==========
   /users/org-admins:
     post:
-      summary: Create OrgAdmin (SysAdmin)
+      summary: Create OrgAdmin (SysAdmin only)
       tags: [Users]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -306,16 +457,20 @@ paths:
                 email: { type: string }
                 password: { type: string }
                 organizationId: { type: string }
-      responses: { '201': { description: Created }, '403': { $ref: '#/components/responses/Forbidden' } }
+      responses:
+        '201': { description: Created }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     get:
-      summary: List OrgAdmins (SysAdmin)
+      summary: List OrgAdmins (SysAdmin only)
       tags: [Users]
       security: [{ bearerAuth: [] }]
       responses: { '200': { description: List of OrgAdmins } }
 
   /users/org-admins/{id}:
     put:
-      summary: Update OrgAdmin (SysAdmin)
+      summary: Update OrgAdmin (SysAdmin only)
       tags: [Users]
       security: [{ bearerAuth: [] }]
       parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
@@ -330,7 +485,7 @@ paths:
       responses: { '200': { description: Updated } }
   /users/org-admins/{id}/deactivate:
     put:
-      summary: Deactivate OrgAdmin (SysAdmin)
+      summary: Deactivate OrgAdmin (SysAdmin only)
       tags: [Users]
       security: [{ bearerAuth: [] }]
       parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
@@ -338,7 +493,7 @@ paths:
 
   /users/dept-admins:
     post:
-      summary: Create DeptAdmin (OrgAdmin)
+      summary: Create DeptAdmin (OrgAdmin only)
       tags: [Users]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -355,14 +510,14 @@ paths:
                 departmentId: { type: string }
       responses: { '201': { description: Created } }
     get:
-      summary: List DeptAdmins (OrgAdmin)
+      summary: List DeptAdmins (OrgAdmin only)
       tags: [Users]
       security: [{ bearerAuth: [] }]
       responses: { '200': { description: List } }
 
   /users/dept-admins/{id}:
     put:
-      summary: Update DeptAdmin (OrgAdmin)
+      summary: Update DeptAdmin (OrgAdmin only)
       tags: [Users]
       security: [{ bearerAuth: [] }]
       parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
@@ -378,7 +533,7 @@ paths:
       responses: { '200': { description: Updated } }
   /users/dept-admins/{id}/deactivate:
     put:
-      summary: Deactivate DeptAdmin (OrgAdmin)
+      summary: Deactivate DeptAdmin (OrgAdmin only)
       tags: [Users]
       security: [{ bearerAuth: [] }]
       parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
@@ -387,7 +542,7 @@ paths:
   # ========== ORGANIZATIONS ==========
   /organizations:
     post:
-      summary: Create organization (SysAdmin)
+      summary: Create organization (SysAdmin only)
       tags: [Organizations]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -402,7 +557,7 @@ paths:
                 code: { type: string }
       responses: { '201': { description: Created } }
     get:
-      summary: List organizations (SysAdmin)
+      summary: List organizations (SysAdmin only)
       tags: [Organizations]
       security: [{ bearerAuth: [] }]
       responses: { '200': { description: List } }
@@ -427,7 +582,7 @@ paths:
 
   /organizations/{id}:
     put:
-      summary: Update organization (SysAdmin)
+      summary: Update organization (SysAdmin only)
       tags: [Organizations]
       security: [{ bearerAuth: [] }]
       parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
@@ -443,7 +598,7 @@ paths:
       responses: { '200': { description: Updated } }
   /organizations/{id}/deactivate:
     put:
-      summary: Deactivate organization (SysAdmin)
+      summary: Deactivate organization (SysAdmin only)
       tags: [Organizations]
       security: [{ bearerAuth: [] }]
       parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
@@ -452,7 +607,7 @@ paths:
   # ========== DEPARTMENTS ==========
   /departments:
     post:
-      summary: Create department (OrgAdmin)
+      summary: Create department (OrgAdmin only)
       tags: [Departments]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -468,14 +623,14 @@ paths:
                 description: { type: string }
       responses: { '201': { description: Created } }
     get:
-      summary: List departments (OrgAdmin)
+      summary: List departments (OrgAdmin only)
       tags: [Departments]
       security: [{ bearerAuth: [] }]
       responses: { '200': { description: List } }
 
   /departments/{id}:
     put:
-      summary: Update department (OrgAdmin)
+      summary: Update department (OrgAdmin only)
       tags: [Departments]
       security: [{ bearerAuth: [] }]
       parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
@@ -491,7 +646,7 @@ paths:
       responses: { '200': { description: Updated } }
   /departments/{id}/deactivate:
     put:
-      summary: Deactivate department (OrgAdmin)
+      summary: Deactivate department (OrgAdmin only)
       tags: [Departments]
       security: [{ bearerAuth: [] }]
       parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
@@ -639,7 +794,6 @@ paths:
                 comment: { type: string }
       responses: { '200': { description: Override successful }, '403': { $ref: '#/components/responses/Forbidden' } }
 
-  
   /ai/moderate:
     post:
       summary: Run AI moderation on a complaint

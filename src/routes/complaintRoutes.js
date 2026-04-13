@@ -10,7 +10,7 @@ const {
   getComplaintsByOrganization,
   adminOverride,
 } = require('../controllers/complaintController');
-const protect = require('../middleware/authMiddleware');
+const { protect } = require('../middleware/authMiddleware');
 const { authorizeRoles } = require('../middleware/roleMiddleware');
 
 // Citizen routes

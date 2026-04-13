@@ -1,0 +1,231 @@
+### ==========================================
+### CONFIGURATION
+### ==========================================
+@baseUrl = http://localhost:5000/api
+
+### ==========================================
+### 1. AUTHENTICATION – Get tokens for all roles
+### ==========================================
+
+### 1.1 Login as Citizen
+# @name citizenLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "citizen@test.com",
+  "password": "Test@1234"
+}
+@citizenToken = {{citizenLogin.response.body.token}}
+
+### 1.2 Login as OrgAdmin
+# @name orgAdminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@eep.com.et",
+  "password": "Admin@123"
+}
+@orgAdminToken = {{orgAdminLogin.response.body.token}}
+
+### 1.3 Login as DeptAdmin
+# @name deptAdminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "water.supply@aawsa.gov.et",
+  "password": "Admin@123"
+}
+@deptAdminToken = {{deptAdminLogin.response.body.token}}
+
+### 1.4 Login as SysAdmin (optional, for org creation)
+# @name sysAdminLogin
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "sysadmin@complaint.gov",
+  "password": "Admin@123"
+}
+@sysAdminToken = {{sysAdminLogin.response.body.token}}
+
+### ==========================================
+### 2. CITIZEN – Create a base complaint (for duplicate detection)
+### ==========================================
+@orgId = 65f1a2b3c4d5e6f7a8b9c0d1   # Replace with actual org ID
+
+# @name baseComplaint
+POST {{baseUrl}}/complaints
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "title": "Water leak near my house",
+  "description": "There is a continuous water leak from the main pipe on Bole Road. It has been flooding the street for 3 days.",
+  "organizationId": "{{orgId}}"
+}
+@baseComplaintId = {{baseComplaint.response.body.complaint.id}}
+
+### ==========================================
+### 3. CITIZEN – Create a potential duplicate complaint (similar to base)
+### ==========================================
+# @name duplicateComplaint
+POST {{baseUrl}}/complaints
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "title": "Water pipe burst on Bole Road",
+  "description": "A pipe burst is causing water to flow on the road. It's been leaking for days and wasting water.",
+  "organizationId": "{{orgId}}"
+}
+@dupComplaintId = {{duplicateComplaint.response.body.complaint.id}}
+
+### ==========================================
+### 4. CITIZEN – Create a spam complaint
+### ==========================================
+# @name spamComplaint
+POST {{baseUrl}}/complaints
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "title": "Buy cheap watches!!!",
+  "description": "Get luxury watches at 90% discount. Limited offer! Click here: http://spam.com",
+  "organizationId": "{{orgId}}"
+}
+@spamComplaintId = {{spamComplaint.response.body.complaint.id}}
+
+### ==========================================
+### 5. CITIZEN – Create a low-confidence (ambiguous) complaint
+### ==========================================
+# @name ambiguousComplaint
+POST {{baseUrl}}/complaints
+Authorization: Bearer {{citizenToken}}
+Content-Type: application/json
+
+{
+  "title": "General issue",
+  "description": "Something is wrong but I don't know what.",
+  "organizationId": "{{orgId}}"
+}
+@ambComplaintId = {{ambiguousComplaint.response.body.complaint.id}}
+
+### ==========================================
+### 6. RUN AI MODERATION ON EACH COMPLAINT
+### ==========================================
+
+### 6.1 Moderate base complaint (should be normal, high confidence, assign department)
+# @name moderateBase
+POST {{baseUrl}}/ai/moderate
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{
+  "complaintId": "{{baseComplaintId}}"
+}
+
+### 6.2 Moderate duplicate complaint (should be marked as duplicate of base)
+# @name moderateDup
+POST {{baseUrl}}/ai/moderate
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{
+  "complaintId": "{{dupComplaintId}}"
+}
+
+### 6.3 Moderate spam complaint (isSpam=true, status=Rejected)
+# @name moderateSpam
+POST {{baseUrl}}/ai/moderate
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{
+  "complaintId": "{{spamComplaintId}}"
+}
+
+### 6.4 Moderate ambiguous complaint (low confidence, status=Manual Review)
+# @name moderateAmb
+POST {{baseUrl}}/ai/moderate
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{
+  "complaintId": "{{ambComplaintId}}"
+}
+
+### ==========================================
+### 7. CHECK NOTIFICATIONS TRIGGERED BY AI
+### ==========================================
+
+### 7.1 OrgAdmin notifications (should see REVIEW_NEEDED for spam and low confidence)
+GET {{baseUrl}}/notifications
+Authorization: Bearer {{orgAdminToken}}
+
+### 7.2 DeptAdmin notifications (should see COMPLAINT_ASSIGNED for base complaint)
+GET {{baseUrl}}/notifications
+Authorization: Bearer {{deptAdminToken}}
+
+### ==========================================
+### 8. VERIFY COMPLAINT STATUSES AFTER AI MODERATION
+### ==========================================
+
+### 8.1 Base complaint – status should be "Submitted" (or "In Progress" if auto-assigned)
+GET {{baseUrl}}/complaints/{{baseComplaintId}}
+Authorization: Bearer {{orgAdminToken}}
+
+### 8.2 Duplicate complaint – status should reflect duplicate (still "Submitted" but duplicateOf set)
+GET {{baseUrl}}/complaints/{{dupComplaintId}}
+Authorization: Bearer {{orgAdminToken}}
+
+### 8.3 Spam complaint – status should be "Rejected"
+GET {{baseUrl}}/complaints/{{spamComplaintId}}
+Authorization: Bearer {{orgAdminToken}}
+
+### 8.4 Ambiguous complaint – status should be "Manual Review"
+GET {{baseUrl}}/complaints/{{ambComplaintId}}
+Authorization: Bearer {{orgAdminToken}}
+
+### ==========================================
+### 9. (Optional) OrgAdmin can override AI decisions
+### ==========================================
+### Example: Override spam to not spam
+PUT {{baseUrl}}/complaints/{{spamComplaintId}}/override
+Authorization: Bearer {{orgAdminToken}}
+Content-Type: application/json
+
+{
+  "isSpam": false,
+  "status": "Submitted",
+  "comment": "False positive, restoring"
+}
+
+### ==========================================
+### 6.5 Verify AI department assignment for base complaint
+### ==========================================
+
+### Fetch the base complaint after moderation to see department
+# @name getBaseComplaint
+GET {{baseUrl}}/complaints/{{baseComplaintId}}
+Authorization: Bearer {{orgAdminToken}}
+
+### Expected: complaint.department should NOT be null, and should match WATER_SUPPLY or similar
+### (Manual check: look for "department" field in response)
+
+### ==========================================
+### 7. CHECK NOTIFICATIONS TRIGGERED BY AI
+### ==========================================
+
+### 7.1 OrgAdmin notifications (REVIEW_NEEDED for spam / low confidence)
+GET {{baseUrl}}/notifications
+Authorization: Bearer {{orgAdminToken}}
+
+### 7.2 DeptAdmin notifications – should include COMPLAINT_ASSIGNED for base complaint
+GET {{baseUrl}}/notifications
+Authorization: Bearer {{deptAdminToken}}
+### ==========================================
+### END OF AI MODERATION TESTS
+### ==========================================

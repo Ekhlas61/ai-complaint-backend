@@ -41,9 +41,10 @@ async function notifyCommentParticipants(complaint, commentAuthor, commentText) 
 }
 
 // Submit new complaint for Citizen role
+// Submit new complaint for Citizen role
 exports.createComplaint = async (req, res) => {
   try {
-    const { title, description, imagePath, latitude, longitude, organizationId } = req.body;
+    const { title, description, attachments, latitude, longitude, organizationId } = req.body;
 
     if (!title || !description) {
       return res.status(400).json({ message: 'Title and description are required' });
@@ -67,10 +68,20 @@ exports.createComplaint = async (req, res) => {
       };
     }
 
+    // Format attachments if provided
+    let formattedAttachments = [];
+    if (attachments && Array.isArray(attachments)) {
+      formattedAttachments = attachments.map(item => ({
+        filename: item.originalName || item.filename || 'image',
+        path: item.url || item.path,   // S3 URL from upload response
+        uploadedAt: new Date(),
+      }));
+    }
+
     const complaint = await Complaint.create({
       title,
       description,
-      imagePath: imagePath || null,
+      attachments: formattedAttachments,
       location,
       submittedBy: req.user._id,
       organization: organizationId,
@@ -89,6 +100,7 @@ exports.createComplaint = async (req, res) => {
         title: complaint.title,
         description: complaint.description,
         status: complaint.status,
+        attachments: complaint.attachments,   // include image URLs in response
         createdAt: complaint.createdAt,
       }
     });
@@ -97,7 +109,6 @@ exports.createComplaint = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 // Async wrapper for AI moderation called after complaint is submitted
 async function moderateComplaintAsync(complaintId) {
   const req = { body: { complaintId } };
@@ -278,7 +289,7 @@ exports.updateComplaintStatus = async (req, res) => {
         user: complaint.submittedBy,
         type: 'STATUS_UPDATED',
         title: 'Complaint status updated',
-        message: friendlyMessage,
+        message: message,
         data: { complaintId: complaint._id, oldStatus, newStatus: status },
         read: false,
       });

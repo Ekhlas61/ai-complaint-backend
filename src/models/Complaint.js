@@ -33,10 +33,6 @@ const complaintSchema = new mongoose.Schema(
         trim: true,
       },
     },
-    imagePath: {
-      type: String,                
-      default: null,
-    },
     submittedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -101,7 +97,7 @@ const complaintSchema = new mongoose.Schema(
       enum: ['Pending', 'Synced', 'Failed'],
       default: 'Pending',
     },
-    attachments: [                   // keep for backward compatibility
+    attachments: [                   
       {
         filename: String,
         path: String,

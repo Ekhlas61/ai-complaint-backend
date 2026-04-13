@@ -4,6 +4,7 @@ const connectDB = require('./src/config/db');
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yamljs");
 const cors = require('cors');
+
 const http = require('http');
 const socketIo = require('socket.io');
 const jwt = require('jsonwebtoken');
@@ -19,6 +20,7 @@ const debugRoutes = require('./src/routes/debugRoutes');
 const analyticsRoutes = require('./src/routes/analyticsRoutes');
 const organizationRoutes = require('./src/routes/organizationRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
+const uploadRoutes = require('./src/routes/uploadRoutes');
 const aiRoutes = require('./src/routes/aiRoutes');
 
 const app = express();
@@ -122,6 +124,7 @@ app.use('/api/debug', debugRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/organizations', organizationRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/uploads', uploadRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Test route
