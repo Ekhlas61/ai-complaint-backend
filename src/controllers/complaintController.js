@@ -72,9 +72,7 @@ exports.createComplaint = async (req, res) => {
     let formattedAttachments = [];
     if (attachments && Array.isArray(attachments)) {
       formattedAttachments = attachments.map(item => ({
-        filename: item.originalName || item.filename || 'image',
-        path: item.url || item.path,   // S3 URL from upload response
-        uploadedAt: new Date(),
+        path: item.url,
       }));
     }
 

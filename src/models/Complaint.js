@@ -99,7 +99,7 @@ const complaintSchema = new mongoose.Schema(
     },
     attachments: [                   
       {
-        filename: String,
+        filename:{type: String, default:'image' },
         path: String,
         uploadedAt: { type: Date, default: Date.now },
       },
