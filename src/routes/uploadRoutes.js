@@ -4,20 +4,18 @@ const router = express.Router();
 
 // Import controllers
 const {
-  uploadSingleFile,
-  uploadMultipleFiles,
-  deleteFile,
-  uploadComplaintImages,
+  uploadMedia,
+  deleteFile
 } = require('../controllers/uploadController');
 
 // Import middleware
 const { protect } = require('../middleware/authMiddleware');
-const { uploadSingle, uploadMultiple, ensureMultipart } = require('../middleware/uploadMiddleware');
+const { uploadMultiple, ensureMultipart } = require('../middleware/uploadMiddleware');
 
-// Routes – clean and simple
-router.post('/single', protect, ensureMultipart, uploadSingle('file'), uploadSingleFile);
-router.post('/multiple', protect, ensureMultipart, uploadMultiple('files', 5), uploadMultipleFiles);
-router.post('/complaint-images', protect, ensureMultipart, uploadMultiple('images', 5), uploadComplaintImages);
+// Universal Route – Handles 1 to 5 images under the "files" field
+router.post('/', protect, ensureMultipart, uploadMultiple('files', 5), uploadMedia);
+
+// Route for deleting images
 router.delete('/', protect, deleteFile);
 
 module.exports = router;

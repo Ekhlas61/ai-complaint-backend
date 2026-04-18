@@ -1,57 +1,45 @@
 const { uploadFile, deleteFile: deleteS3File } = require('../utils/s3Service');
 
-// Upload single file
-exports.uploadSingleFile = async (req, res) => {
+// Universal upload handler for both single and multiple files
+exports.uploadMedia = async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ message: 'No file provided' });
+    let filesToUpload = [];
+
+    // The middleware will populate req.files if it's an array
+    if (req.files && req.files.length > 0) {
+      filesToUpload = req.files;
+    } else if (req.file) { // Fallback just in case
+      filesToUpload = [req.file];
     }
 
-    const folder = req.body.folder || 'general';
-    const uploadResult = await uploadFile(req.file, folder);
-
-    res.status(200).json({
-      message: 'File uploaded successfully',
-      file: {
-        url: uploadResult.url,
-        key: uploadResult.key,
-        originalName: req.file.originalname,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
-      },
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ message: error.message || 'Failed to upload file' });
-  }
-};
-
-// Upload multiple files
-exports.uploadMultipleFiles = async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: 'No files provided' });
+    if (filesToUpload.length === 0) {
+      return res.status(400).json({ message: 'No file(s) provided' });
     }
 
-    const folder = req.body.folder || 'general';
-    const uploadPromises = req.files.map(file => uploadFile(file, folder));
+    // Determine target folder based on provided body variables
+    const folder = req.body.complaintId 
+      ? `complaints/${req.body.complaintId}` 
+      : (req.body.folder || 'general');
+
+    const uploadPromises = filesToUpload.map(file => uploadFile(file, folder));
     const uploadResults = await Promise.all(uploadPromises);
 
     const uploadedFiles = uploadResults.map((result, index) => ({
       url: result.url,
       key: result.key,
-      originalName: req.files[index].originalname,
-      size: req.files[index].size,
-      mimetype: req.files[index].mimetype,
+      originalName: filesToUpload[index].originalname,
+      size: filesToUpload[index].size,
+      mimetype: filesToUpload[index].mimetype,
     }));
 
     res.status(200).json({
-      message: 'Files uploaded successfully',
+      message: 'File(s) uploaded successfully',
       files: uploadedFiles,
+      urls: uploadedFiles.map(f => f.url)
     });
   } catch (error) {
-    console.error('Multiple upload error:', error);
-    res.status(500).json({ message: error.message || 'Failed to upload files' });
+    console.error('Universal upload error:', error);
+    res.status(500).json({ message: error.message || 'Failed to upload file(s)' });
   }
 };
 
@@ -70,36 +58,5 @@ exports.deleteFile = async (req, res) => {
   } catch (error) {
     console.error('Delete error:', error);
     res.status(500).json({ message: error.message || 'Failed to delete file' });
-  }
-};
-
-// Upload images specifically for complaints
-exports.uploadComplaintImages = async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ message: 'No images provided' });
-    }
-
-    const complaintId = req.body.complaintId || 'unknown';
-    const folder = `complaints/${complaintId}`;
-
-    const uploadPromises = req.files.map(file => uploadFile(file, folder));
-    const uploadResults = await Promise.all(uploadPromises);
-
-    const uploadedImages = uploadResults.map((result, index) => ({
-      url: result.url,
-      key: result.key,
-      originalName: req.files[index].originalname,
-      size: req.files[index].size,
-      mimetype: req.files[index].mimetype,
-    }));
-
-    res.status(200).json({
-      message: 'Complaint images uploaded successfully',
-      images: uploadedImages,
-    });
-  } catch (error) {
-    console.error('Complaint images upload error:', error);
-    res.status(500).json({ message: error.message || 'Failed to upload complaint images' });
   }
 };
