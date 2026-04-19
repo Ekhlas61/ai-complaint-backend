@@ -319,29 +319,9 @@ paths:
       responses: { '200': { description: Changed }, '401': { $ref: '#/components/responses/Unauthorized' } }
 
   # ========== FILE UPLOADS ==========
-  /uploads/single:
+  /uploads:
     post:
-      summary: Upload a single file
-      tags: [File Upload]
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [file]
-              properties:
-                file: { type: string, format: binary }
-                folder: { type: string }
-      responses:
-        '200': { description: Uploaded }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-
-  /uploads/multiple:
-    post:
-      summary: Upload multiple files
+      summary: Upload one or multiple files
       tags: [File Upload]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -352,34 +332,21 @@ paths:
               type: object
               required: [files]
               properties:
-                files: { type: array, items: { type: string, format: binary } }
-                folder: { type: string }
+                files: 
+                  type: array
+                  items: { type: string, format: binary }
+                  description: "Upload up to 5 files. Even for a single file, use 'files' key."
+                folder: 
+                  type: string
+                  description: "Optional. Custom folder to store files in."
+                complaintId: 
+                  type: string
+                  description: "Optional. Sets folder to complaints/{complaintId}."
       responses:
-        '200': { description: Uploaded }
+        '200': { description: Uploaded successfully }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
-  /uploads/complaint-images:
-    post:
-      summary: Upload complaint images
-      tags: [File Upload]
-      security: [{ bearerAuth: [] }]
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [images]
-              properties:
-                images: { type: array, items: { type: string, format: binary } }
-                complaintId: { type: string }
-      responses:
-        '200': { description: Uploaded }
-        '400': { $ref: '#/components/responses/BadRequest' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-
-  /uploads:
     delete:
       summary: Delete a file from S3
       tags: [File Upload]

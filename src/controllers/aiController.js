@@ -1,7 +1,7 @@
 const Complaint = require('../models/Complaint');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
-const { moderateComplaint } = require('../services/aiService');
+const { moderateComplaint: aiServiceModerate } = require('../services/aiService');
 const { getDepartmentsForPrompt, findDepartmentByCode } = require('../utils/departmentHelper');
 
 // ========== Helper: Jaccard similarity ==========
@@ -78,7 +78,7 @@ exports.moderateComplaint = async (req, res) => {
       return res.status(400).json({ message: 'No departments found for this organization' });
     }
 
-    const aiResult = await moderateComplaint(complaint.title, complaint.description, orgName, departmentsList);
+    const aiResult = await aiServiceModerate(complaint.title, complaint.description, orgName, departmentsList);
     const duplicateComplaint = await findDuplicateComplaint(complaint, 0.7);
     const duplicateOfId = duplicateComplaint ? duplicateComplaint._id : null;
     const matchedDept = aiResult.department ? await findDepartmentByCode(complaint.organization._id, aiResult.department) : null;
@@ -136,5 +136,4 @@ exports.moderateComplaint = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
-module.exports = { moderateComplaint};
+

@@ -109,8 +109,8 @@ exports.forgotPassword = async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
-      return res.status(200).json({
-        message: ' A reset link has been sent.',
+      return res.status(404).json({
+        message: 'No account found with that email address.',
       });
     }
 
@@ -198,9 +198,8 @@ exports.forgotPasswordOTP = async (req, res) => {
     const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
-      // Don't reveal if user exists or not
-      return res.status(200).json({
-        message: 'If an account with this email exists, an OTP has been sent.',
+      return res.status(404).json({
+        message: 'No account found with that email address.',
       });
     }
 
