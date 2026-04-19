@@ -40,7 +40,7 @@ async function notifyCommentParticipants(complaint, commentAuthor, commentText) 
   await Notification.insertMany(notifications);
 }
 
-// Submit new complaint for Citizen role
+
 // Submit new complaint for Citizen role
 exports.createComplaint = async (req, res) => {
   try {
@@ -98,7 +98,7 @@ exports.createComplaint = async (req, res) => {
         title: complaint.title,
         description: complaint.description,
         status: complaint.status,
-        attachments: complaint.attachments,   // include image URLs in response
+        attachments: complaint.attachments,   
         createdAt: complaint.createdAt,
       }
     });

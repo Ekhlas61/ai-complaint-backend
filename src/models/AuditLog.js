@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const auditLogSchema = new mongoose.Schema(
   {
-    // Who performed the action
+   // to show the user who performed the action
     user: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
@@ -10,7 +10,7 @@ const auditLogSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Action type – limited to exactly what you requested
+    // this shows the action what was performed
     action: {
       type: String,
       required: true,
@@ -31,14 +31,14 @@ const auditLogSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Human-readable explanation (required)
+    // this is the description of the action performed
     description: {
       type: String,
       required: true,
       trim: true,
     },
 
-    // What was affected
+    // this the entity that was affected
     targetType: {
       type: String,
       enum: ['User', 'Complaint', 'Department'],
@@ -51,7 +51,38 @@ const auditLogSchema = new mongoose.Schema(
       index: true,
     },
 
-    // Optional – IP address (useful for basic security tracking)
+    oldValue: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+      comment: 'Previous state (e.g., old status, old assigned user)',
+    },
+    newValue: {
+      type: mongoose.Schema.Types.Mixed,
+      default: null,
+      comment: 'New state after the action',
+    },
+
+    // to filter by organizaition
+    orgId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Organization',
+      index: true,
+      required: [true, 'Organization ID is required for audit context'],
+    },
+
+  
+    status: {
+      type: String,
+      enum: ['SUCCESS', 'FAILURE'],
+      required: true,
+      default: 'SUCCESS',
+    },
+    errorMessage: {
+      type: String,
+      default: null,
+      trim: true,
+    },
+
     ip: {
       type: String,
       trim: true,
@@ -59,14 +90,44 @@ const auditLogSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true,
+    timestamps: true, 
   }
 );
 
-// Recommended indexes for common queries
-auditLogSchema.index({ user: 1, createdAt: -1 });                    // Recent actions by user
-auditLogSchema.index({ targetType: 1, targetId: 1, createdAt: -1 }); // Actions on specific entity
-auditLogSchema.index({ action: 1, createdAt: -1 });                  // All actions of one type
-auditLogSchema.index({ createdAt: -1 });                             // Time-based overview
+// immutability rules
+auditLogSchema.pre('updateOne', function () {
+  throw new Error('Audit logs are immutable – updates are forbidden');
+});
+auditLogSchema.pre('updateMany', function () {
+  throw new Error('Audit logs are immutable – updates are forbidden');
+});
+auditLogSchema.pre('deleteOne', function () {
+  throw new Error('Audit logs cannot be deleted');
+});
+auditLogSchema.pre('deleteMany', function () {
+  throw new Error('Audit logs cannot be deleted');
+});
+auditLogSchema.pre('findOneAndUpdate', function () {
+  throw new Error('Audit logs are immutable');
+});
+auditLogSchema.pre('findOneAndDelete', function () {
+  throw new Error('Audit logs cannot be deleted');
+});
+
+
+auditLogSchema.pre('save', function (next) {
+  if (!this.isNew) {
+    return next(new Error('Cannot modify existing audit log – immutable'));
+  }
+  next();
+});
+
+//indexes
+auditLogSchema.index({ user: 1, createdAt: -1 });
+auditLogSchema.index({ targetType: 1, targetId: 1, createdAt: -1 });
+auditLogSchema.index({ action: 1, createdAt: -1 });
+auditLogSchema.index({ createdAt: -1 });
+auditLogSchema.index({ orgId: 1, createdAt: -1 });           
+auditLogSchema.index({ status: 1 });                         
 
 module.exports = mongoose.model('AuditLog', auditLogSchema);

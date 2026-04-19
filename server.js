@@ -66,7 +66,7 @@ io.use(async (socket, next) => {
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.user._id}`);
-  socket.join(`user:${socket.user._id}`); // room for private notifications
+  socket.join(`user:${socket.user._id}`); 
   socket.on('disconnect', () => {
     console.log(`User disconnected: ${socket.user._id}`);
   });
