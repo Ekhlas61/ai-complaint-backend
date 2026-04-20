@@ -198,16 +198,19 @@ exports.getComments = async (req, res) => {
 // Get assigned complaints for DeptAdmin role
 exports.getAssignedComplaints = async (req, res) => {
   try {
-    const assignedTo = req.user._id;
-    const match = { assignedTo };
-    if (req.query.status) {
-      match.status = req.query.status;
+   const departmentId = req.user.department;
+    if (!departmentId) {
+      return res.status(400).json({ message: 'Admin not associated with any department' });
     }
+
+    const match = { department: departmentId };
+
     const complaints = await Complaint.find(match)
       .populate('submittedBy', 'fullName email')
       .populate('department', 'name code')
       .sort({ createdAt: -1 })
-      .limit(50); 
+      .limit(50);
+
     res.json(complaints);
   } catch (err) {
     console.error(err);
