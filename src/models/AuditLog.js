@@ -115,12 +115,6 @@ auditLogSchema.pre('findOneAndDelete', function () {
 });
 
 
-auditLogSchema.pre('save', function (next) {
-  if (!this.isNew) {
-    return next(new Error('Cannot modify existing audit log – immutable'));
-  }
-  next();
-});
 
 //indexes
 auditLogSchema.index({ user: 1, createdAt: -1 });
