@@ -224,7 +224,6 @@ exports.updateComplaintStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
 
-    // Allowed statuses for DeptAdmin
     const allowedStatuses = ['In Progress', 'Resolved'];
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ message: 'DeptAdmin can only change status to "In Progress" or "Resolved"' });
@@ -235,14 +234,12 @@ exports.updateComplaintStatus = async (req, res) => {
       return res.status(404).json({ message: 'Complaint not found' });
     }
 
-    // Authorize by department
     const adminDepartmentId = req.user.department;
     if (!adminDepartmentId || complaint.department?.toString() !== adminDepartmentId.toString()) {
       return res.status(403).json({ message: 'You are not authorized to update this complaint' });
     }
 
     const oldStatus = complaint.status;
-
     if (status === oldStatus) {
       return res.status(400).json({ message: 'New status must be different from current status' });
     }
@@ -257,21 +254,20 @@ exports.updateComplaintStatus = async (req, res) => {
     });
 
     await AuditLog.create({
-        user: req.user._id,
-        action: 'UPDATE_STATUS',
-        description: `Complaint ${id} status changed from ${oldStatus} to ${status}`,
-        targetType: 'Complaint',
-        targetId: complaint._id,
-        ip: req.ip,
-        orgId: complaint.organization,          
-        oldValue: { status: oldStatus },        
-        newValue: { status: status },          
-        status: 'SUCCESS'                       
-      });
+      user: req.user._id,
+      action: 'UPDATE_STATUS',
+      description: `Complaint ${id} status changed from ${oldStatus} to ${status}`,
+      targetType: 'Complaint',
+      targetId: complaint._id,
+      ip: req.ip,
+      orgId: complaint.organization,
+      oldValue: { status: oldStatus },
+      newValue: { status: status },
+      status: 'SUCCESS',
+    });
 
     await complaint.save();
 
-    // Notify citizen
     let message = '';
     switch (status) {
       case 'Resolved':
@@ -292,13 +288,10 @@ exports.updateComplaintStatus = async (req, res) => {
       read: false,
     });
 
-    res.json({
-      message: 'Complaint status updated successfully',
-      complaint,
-    });
+    res.json({ message: 'Complaint status updated successfully' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error', details: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 // Get all complaints in the organization for OrgAdmin role
