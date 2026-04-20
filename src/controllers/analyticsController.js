@@ -15,10 +15,15 @@ const getStats = async (filter) => {
 // ========== DEPTADMIN ==========
 exports.getDeptAdminStats = async (req, res) => {
   try {
-    const stats = await getStats({ assignedTo: req.user._id });
+    const departmentId = req.user.department;
+    if (!departmentId) {
+      return res.status(400).json({ message: 'Admin not associated with any department' });
+    }
+    const stats = await getStats({ department: departmentId });
     res.json(stats);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
