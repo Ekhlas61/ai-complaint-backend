@@ -257,13 +257,17 @@ exports.updateComplaintStatus = async (req, res) => {
     });
 
     await AuditLog.create({
-      user: req.user._id,
-      action: 'UPDATE_STATUS',
-      description: `Complaint ${id} status changed from ${oldStatus} to ${status}`,
-      targetType: 'Complaint',
-      targetId: complaint._id,
-      ip: req.ip,
-    });
+        user: req.user._id,
+        action: 'UPDATE_STATUS',
+        description: `Complaint ${id} status changed from ${oldStatus} to ${status}`,
+        targetType: 'Complaint',
+        targetId: complaint._id,
+        ip: req.ip,
+        orgId: complaint.organization,          
+        oldValue: { status: oldStatus },        
+        newValue: { status: status },          
+        status: 'SUCCESS'                       
+      });
 
     await complaint.save();
 
