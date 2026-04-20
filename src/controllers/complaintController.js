@@ -303,21 +303,21 @@ exports.updateComplaintStatus = async (req, res) => {
 // Get all complaints in the organization for OrgAdmin role
 exports.getComplaintsByOrganization = async (req, res) => {
   try {
-    if (!['OrgAdmin', 'SysAdmin'].includes(req.user.role)) {
-      return res.status(403).json({ message: 'Access denied. Only OrgAdmin or SysAdmin.' });
+    
+    if (req.user.role !== 'OrgAdmin') {
+      return res.status(403).json({ message: 'Access denied. Only OrgAdmin allowed.' });
     }
-    const organizationId = req.user.organization; 
+
+    const organizationId = req.user.organization;
     if (!organizationId) {
       return res.status(400).json({ message: 'User not associated with any organization' });
     }
-    const filter = { organization: organizationId };
-    if (req.query.status) {
-      filter.status = req.query.status;
-    }
-    const complaints = await Complaint.find(filter)
+
+    const complaints = await Complaint.find({ organization: organizationId })
       .populate('submittedBy', 'fullName email')
       .populate('department', 'name code')
       .sort({ createdAt: -1 });
+
     res.json(complaints);
   } catch (err) {
     console.error(err);
