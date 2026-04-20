@@ -298,10 +298,9 @@ exports.updateComplaintStatus = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: 'Server error', details: err.message });
   }
 };
-
 // Get all complaints in the organization for OrgAdmin role
 exports.getComplaintsByOrganization = async (req, res) => {
   try {
