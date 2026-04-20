@@ -139,13 +139,15 @@ exports.addComment = async (req, res) => {
 
     const complaint = await Complaint.findById(req.params.id);
     if (!complaint) {
-      return res.status(404).json({ message: 'Complaint not found' });
+      return res.status(404). json({ message: 'Complaint not found' });
     }
 
-    const isOwner = complaint.submittedBy.toString() === req.user._id.toString();
-    const isAssigned = complaint.assignedTo && complaint.assignedTo.toString() === req.user._id.toString();
+    const isDeptAdmin = req.user.role === 'DeptAdmin' && 
+                        complaint.department && 
+                        complaint.department.toString() === req.user.department?.toString();
     const isOrgAdmin = req.user.role === 'OrgAdmin';
-    if (!isOwner && !isAssigned && !isOrgAdmin) {
+
+    if (!isDeptAdmin && !isOrgAdmin) {
       return res.status(403).json({ message: 'Not authorized to comment on this complaint' });
     }
 
@@ -167,6 +169,7 @@ exports.addComment = async (req, res) => {
     const populatedComment = await Comment.findById(comment._id).populate('author', 'fullName email');
     res.status(201).json(populatedComment);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 };
@@ -174,15 +177,17 @@ exports.addComment = async (req, res) => {
 // Get comments with permission check
 exports.getComments = async (req, res) => {
   try {
-    const complaint = await Complaint.findById(req.params.id).select('submittedBy assignedTo');
+    const complaint = await Complaint.findById(req.params.id).select('submittedBy assignedTo department');
     if (!complaint) {
       return res.status(404).json({ message: 'Complaint not found' });
     }
 
-    const isOwner = complaint.submittedBy.toString() === req.user._id.toString();
-    const isAssigned = complaint.assignedTo && complaint.assignedTo.toString() === req.user._id.toString();
+    const isDeptAdmin = req.user.role === 'DeptAdmin' && 
+                        complaint.department && 
+                        complaint.department.toString() === req.user.department?.toString();
     const isOrgAdmin = req.user.role === 'OrgAdmin';
-    if (!isOwner && !isAssigned && !isOrgAdmin) {
+
+    if (!isDeptAdmin && !isOrgAdmin) {
       return res.status(403).json({ message: 'Not authorized to view comments on this complaint' });
     }
 
@@ -191,6 +196,7 @@ exports.getComments = async (req, res) => {
       .sort({ createdAt: -1 });
     res.json(comments);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 };
