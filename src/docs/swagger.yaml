@@ -991,12 +991,11 @@ paths:
           application/json:
             schema:
               type: object
+              required: [status]
               properties:
                 status:
                   type: string
-                  enum: [Submitted, 'Manual Review', 'In Progress', Resolved, Rejected]
-                comment:
-                  type: string
+                  enum: ['In Progress', 'Resolved']
       responses:
         '200':
           description: Updated

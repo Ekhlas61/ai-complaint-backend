@@ -222,82 +222,74 @@ exports.getAssignedComplaints = async (req, res) => {
 exports.updateComplaintStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, comment } = req.body;
+    const { status } = req.body;
+
+    // Allowed statuses for DeptAdmin
+    const allowedStatuses = ['In Progress', 'Resolved'];
+    if (!allowedStatuses.includes(status)) {
+      return res.status(400).json({ message: 'DeptAdmin can only change status to "In Progress" or "Resolved"' });
+    }
 
     const complaint = await Complaint.findById(id);
     if (!complaint) {
       return res.status(404).json({ message: 'Complaint not found' });
     }
-    if (complaint.assignedTo?.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'This complaint is not assigned to you' });
+
+    // Authorize by department
+    const adminDepartmentId = req.user.department;
+    if (!adminDepartmentId || complaint.department?.toString() !== adminDepartmentId.toString()) {
+      return res.status(403).json({ message: 'You are not authorized to update this complaint' });
     }
 
     const oldStatus = complaint.status;
 
-    if (status && status !== oldStatus) {
-      complaint.status = status;
-      if (status === 'Resolved') {
-        complaint.resolvedAt = new Date();
-      }
-      complaint.history.push({
-        action: `Status changed to ${status}`,
-        by: req.user._id,
-        comment: comment || undefined,
-      });
-      await AuditLog.create({
-        user: req.user._id,
-        action: 'UPDATE_STATUS',
-        description: `Complaint ${id} status changed from ${oldStatus} to ${status}`,
-        targetType: 'Complaint',
-        targetId: complaint._id,
-        ip: req.ip,
-      });
-    } else if (comment) {
-      complaint.history.push({
-        action: 'Comment added',
-        by: req.user._id,
-        comment,
-      });
-      await AuditLog.create({
-        user: req.user._id,
-        action: 'ADD_COMMENT',
-        description: `Comment added to complaint ${id}`,
-        targetType: 'Complaint',
-        targetId: complaint._id,
-        ip: req.ip,
-      });
+    if (status === oldStatus) {
+      return res.status(400).json({ message: 'New status must be different from current status' });
     }
+
+    complaint.status = status;
+    if (status === 'Resolved') {
+      complaint.resolvedAt = new Date();
+    }
+    complaint.history.push({
+      action: `Status changed to ${status}`,
+      by: req.user._id,
+    });
+
+    await AuditLog.create({
+      user: req.user._id,
+      action: 'UPDATE_STATUS',
+      description: `Complaint ${id} status changed from ${oldStatus} to ${status}`,
+      targetType: 'Complaint',
+      targetId: complaint._id,
+      ip: req.ip,
+    });
 
     await complaint.save();
 
-    // Notify citizen only when status actually changes
-    if (status && status !== oldStatus) {
-      let message = '';
-      switch (status) {
-        case 'Resolved':
-          message = `Your complaint "${complaint.title}" has been resolved. Thank you for your patience.`;
-          break;
-        case 'In Progress':
-          message = `Your complaint "${complaint.title}" is now in progress. We are working on it.`;
-          break;
-        case 'Rejected':
-          message = `Your complaint "${complaint.title}" could not be accepted. Please contact support for details.`;
-          break;
-        default:
-          message = `Your complaint "${complaint.title}" status changed from ${oldStatus} to ${status}.`;
-      }
-      await Notification.create({
-        user: complaint.submittedBy,
-        type: 'STATUS_UPDATED',
-        title: 'Complaint status updated',
-        message: message,
-        data: { complaintId: complaint._id, oldStatus, newStatus: status },
-        read: false,
-      });
+    // Notify citizen
+    let message = '';
+    switch (status) {
+      case 'Resolved':
+        message = `Your complaint "${complaint.title}" has been resolved. Thank you for your patience.`;
+        break;
+      case 'In Progress':
+        message = `Your complaint "${complaint.title}" is now in progress. We are working on it.`;
+        break;
+      default:
+        message = `Your complaint "${complaint.title}" status changed from ${oldStatus} to ${status}.`;
     }
+    await Notification.create({
+      user: complaint.submittedBy,
+      type: 'STATUS_UPDATED',
+      title: 'Complaint status updated',
+      message: message,
+      data: { complaintId: complaint._id, oldStatus, newStatus: status },
+      read: false,
+    });
 
     res.json({
-      message: 'Complaint updated successfully',
+      message: 'Complaint status updated successfully',
       complaint,
     });
   } catch (err) {

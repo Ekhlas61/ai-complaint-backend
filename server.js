@@ -28,7 +28,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: process.env.FRONTEND_URL ||  'https://complaint-resolution-system.vercel.app',
     credentials: true,
   },
 });
@@ -82,7 +82,8 @@ const allowedOrigins = [
   'https://ai-complaint-backend-7xc5.onrender.com',
   'http://localhost:50510', // Flutter development
   'http://localhost:3000',  // Common React development
-  'http://localhost:8080',  // Common Vue/Angular development           
+  'http://localhost:8080',  // Common Vue/Angular development     
+  'https://complaint-resolution-system.vercel.app'      
 ];
 
 app.use(cors({
