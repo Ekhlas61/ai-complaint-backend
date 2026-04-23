@@ -129,8 +129,8 @@ exports.forgotPassword = async (req, res) => {
 
     await user.save();
 
-    // Create reset URL (use localhost frontend if FRONTEND_URL not set)
-    const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
+    // Create reset URL (Dynamic: checks body first, then Origin header, then ENV fallback)
+    const frontend = req.body.clientUrl || req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
     const resetUrl = `${frontend}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
     const html = `
