@@ -27,6 +27,6 @@ router.post('/reset-password-otp', resetPasswordWithOTP);
 router.get('/profile', protect, getProfile);
 router.post('/change-password', protect, changePassword);
 
-router.post('/logout', authController.logout);
+router.post('/logout', logout);
 
 module.exports = router;

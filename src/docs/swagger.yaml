@@ -518,6 +518,26 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /auth/logout:
+    post:
+      summary: Logout current user
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   # ========== FILE UPLOADS ==========
   /uploads:
     post:
