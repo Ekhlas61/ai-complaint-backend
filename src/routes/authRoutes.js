@@ -11,6 +11,9 @@ const {
   resetPasswordWithOTP,
   getProfile,
   changePassword,
+  logout
+  
+  
 } = require('../controllers/authController');
 
 
@@ -23,5 +26,7 @@ router.post('/reset-password-otp', resetPasswordWithOTP);
 
 router.get('/profile', protect, getProfile);
 router.post('/change-password', protect, changePassword);
+
+router.post('/logout', authController.logout);
 
 module.exports = router;
