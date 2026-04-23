@@ -94,7 +94,7 @@ const seedAll = async () => {
       console.log(`OrgAdmin seeded: ${admin.email} (org: ${admin.organization})`);
     }
 
-    // ========== CREATE DEPARTMENTS (concise AI‑friendly descriptions) ==========
+    //CREATE DEPARTMENTS  
     
     // AAWSA departments
     const aawsaDepartments = [
