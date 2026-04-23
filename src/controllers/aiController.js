@@ -4,22 +4,22 @@ const User = require('../models/User');
 const { moderateComplaint: aiServiceModerate } = require('../services/aiService');
 const { getDepartmentsForPrompt, findDepartmentByCode } = require('../utils/departmentHelper');
 
-// ========== Helper: Jaccard similarity ==========
+// Jaccard similarity 
 function calculateSimilarity(text1, text2) {
-  const words1 = new Set(text1.toLowerCase().split(/\s+/));
-  const words2 = new Set(text2.toLowerCase().split(/\s+/));
+  const words1 = new Set(text1.toLowerCase().split(/\s+/).filter(w => w.length > 2)); 
+  const words2 = new Set(text2.toLowerCase().split(/\s+/).filter(w => w.length > 2));
   const intersection = new Set([...words1].filter(x => words2.has(x)));
   const union = new Set([...words1, ...words2]);
   return intersection.size / union.size;
 }
 
-// ========== Helper: Find duplicate complaint ==========
-async function findDuplicateComplaint(complaint, similarityThreshold = 0.7) {
+// Find duplicate complaint 
+async function findDuplicateComplaint(complaint, similarityThreshold = 0.55) { 
   const candidates = await Complaint.find({
     organization: complaint.organization,
     _id: { $ne: complaint._id },
-    status: { $ne: 'Rejected' },
-  }).limit(20);
+    status: { $ne: 'Rejected' }, 
+  }).limit(20); 
 
   let bestMatch = null;
   let highestSimilarity = 0;
@@ -36,7 +36,7 @@ async function findDuplicateComplaint(complaint, similarityThreshold = 0.7) {
   return bestMatch;
 }
 
-// ========== Notification helpers ==========
+// Notification helpers 
 async function notifyDepartmentAdmins(departmentId, complaintId, complaintTitle) {
   const admins = await User.find({ department: departmentId, role: 'DeptAdmin' }).select('_id');
   if (!admins.length) return;
@@ -65,7 +65,7 @@ async function notifyOrgAdmins(organizationId, complaintId, complaintTitle, reas
   await Notification.insertMany(notifications);
 }
 
-// monderate endpoint
+// moderation endpoint 
 exports.moderateComplaint = async (req, res) => {
   try {
     const { complaintId } = req.body;
@@ -78,62 +78,90 @@ exports.moderateComplaint = async (req, res) => {
       return res.status(400).json({ message: 'No departments found for this organization' });
     }
 
+    // AI classification
     const aiResult = await aiServiceModerate(complaint.title, complaint.description, orgName, departmentsList);
-    const duplicateComplaint = await findDuplicateComplaint(complaint, 0.7);
+    
+    // Duplicate detection 
+    const duplicateComplaint = await findDuplicateComplaint(complaint, 0.55);
     const duplicateOfId = duplicateComplaint ? duplicateComplaint._id : null;
-    const matchedDept = aiResult.department ? await findDepartmentByCode(complaint.organization._id, aiResult.department) : null;
+    
+    // Department mapping 
+    let matchedDept = null;
+    if (aiResult.department) {
+      matchedDept = await findDepartmentByCode(complaint.organization._id, aiResult.department);
+      if (!matchedDept) {
+        console.warn(`Department code ${aiResult.department} not found in organization ${complaint.organization._id}`);
+      }
+    }
 
-    // Update complaint fields (category removed)
+ 
     complaint.isSpam = aiResult.isSpam;
     complaint.priority = aiResult.priority;
     complaint.aiConfidence = aiResult.aiConfidence;
     complaint.duplicateOf = duplicateOfId;
-    // complaint.category = aiResult.category;  
     if (matchedDept) complaint.department = matchedDept._id;
+    else complaint.department = null; 
 
-    // Auto-status logic
-    if (aiResult.isSpam) {
+    // Auto-status updating logic 
+    if (aiResult.isSpam && aiResult.aiConfidence >= 0.7) {
       complaint.status = 'Rejected';
+    } else if (aiResult.isSpam && aiResult.aiConfidence < 0.7) {
+      complaint.status = 'Manual Review'; 
     } else if (aiResult.aiConfidence < 0.7) {
+      complaint.status = 'Manual Review';
+    } else if (!matchedDept && !aiResult.isSpam && aiResult.aiConfidence >= 0.7) {
       complaint.status = 'Manual Review';
     } else {
       complaint.status = 'Submitted';
     }
 
-    let historyComment = `AI assigned priority=${aiResult.priority}, department=${aiResult.department}, confidence=${aiResult.aiConfidence}`;
-    if (duplicateOfId) historyComment += `. Marked as duplicate of ${duplicateOfId}.`;
+    // History log with more detail
+    let historyComment = `AI: spam=${aiResult.isSpam}, priority=${aiResult.priority}, department=${aiResult.department || 'none'}, confidence=${aiResult.aiConfidence}`;
+    if (duplicateOfId) historyComment += ` | Duplicate of ${duplicateOfId} (similarity ${duplicateComplaint ? 'matched' : '?'})`;
+    if (!matchedDept && aiResult.department) historyComment += ` | Department code "${aiResult.department}" not found in system`;
     complaint.history.push({ action: 'AI Moderated', by: null, comment: historyComment });
 
     await complaint.save();
 
-    // Notify OrgAdmin if needed
+    // Notify OrgAdmins for specific conditions
     let notifyOrgReason = null;
-    if (aiResult.isSpam) {
-      notifyOrgReason = 'Marked as spam by AI.';
+    if (aiResult.isSpam && aiResult.aiConfidence >= 0.7) {
+      notifyOrgReason = 'Marked as spam by AI (high confidence).';
+    } else if (aiResult.isSpam && aiResult.aiConfidence < 0.7) {
+      notifyOrgReason = `Possible spam with low confidence (${aiResult.aiConfidence}). Manual review needed.`;
     } else if (aiResult.aiConfidence < 0.7) {
       notifyOrgReason = `AI confidence low (${aiResult.aiConfidence}). Manual review needed.`;
-    } else if (!matchedDept && !aiResult.isSpam) {
-      notifyOrgReason = 'AI could not assign a department.';
+    } else if (!matchedDept && !aiResult.isSpam && aiResult.aiConfidence >= 0.7) {
+      notifyOrgReason = 'AI high confidence but no department assigned. Manual routing needed.';
     }
     if (notifyOrgReason) {
       await notifyOrgAdmins(complaint.organization._id, complaint._id, complaint.title, notifyOrgReason);
     }
 
-    // Notify DeptAdmins only if high confidence, non-spam, non-duplicate, and department assigned
-    if (!aiResult.isSpam && !duplicateOfId && matchedDept && aiResult.aiConfidence >= 0.7) {
+    
+    const shouldNotifyDept = !duplicateOfId && matchedDept && 
+                              (complaint.status === 'Submitted') && 
+                              !aiResult.isSpam;
+    if (shouldNotifyDept) {
       await notifyDepartmentAdmins(matchedDept._id, complaint._id, complaint.title);
     }
 
     res.json({
       success: true,
-      aiResult: { ...aiResult, duplicateOf: duplicateOfId },
+      aiResult: {
+        isSpam: aiResult.isSpam,
+        priority: aiResult.priority,
+        department: aiResult.department,
+        duplicateOf: duplicateOfId,
+        aiConfidence: aiResult.aiConfidence,
+      },
       finalStatus: complaint.status,
       assignedDepartmentId: matchedDept?._id,
       duplicateFound: !!duplicateOfId,
+      warnings: !matchedDept && aiResult.department ? 'Department code not found' : null,
     });
   } catch (err) {
-    console.error(err);
+    console.error('Moderation error:', err);
     res.status(500).json({ message: err.message });
   }
 };
-

@@ -1,6 +1,6 @@
 openapi: 3.0.0
 info:
-  title: Smart Complaint Management System API
+  title: AI-assisted Complaint Resolution System API
   version: 3.0.0
 servers:
   - url: https://ai-complaint-backend-7xc5.onrender.com/api
@@ -963,12 +963,6 @@ paths:
       tags: [Complaints]
       security:
         - bearerAuth: []
-      parameters:
-        - name: status
-          in: query
-          schema:
-            type: string
-            enum: [Submitted, 'Manual Review', 'In Progress', Resolved, Rejected]
       responses:
         '200':
           description: List of complaints
