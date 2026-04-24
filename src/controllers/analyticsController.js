@@ -12,12 +12,12 @@ const getStats = async (filter) => {
   return { total, resolved, pending, resolvedPercentage };
 };
 
-// ========== DEPTADMIN ==========
-exports.getDeptAdminStats = async (req, res) => {
+// ========== DEPTHEAD ==========
+exports.getDeptHeadStats = async (req, res) => {
   try {
     const departmentId = req.user.department;
     if (!departmentId) {
-      return res.status(400).json({ message: 'Admin not associated with any department' });
+      return res.status(400).json({ message: 'DeptHead not associated with any department' });
     }
     const stats = await getStats({ department: departmentId });
     res.json(stats);
@@ -27,8 +27,8 @@ exports.getDeptAdminStats = async (req, res) => {
   }
 };
 
-// ========== ORGADMIN ==========
-exports.getOrgAdminStats = async (req, res) => {
+// ========== ORGHEAD ==========
+exports.getOrgHeadStats = async (req, res) => {
   try {
     const orgId = req.user.organization;
     if (!orgId) {
@@ -41,9 +41,9 @@ exports.getOrgAdminStats = async (req, res) => {
       isActive: true,
     }).select('_id name');
 
-    // Count total DeptAdmins in this organization
-    const totalAdmins = await User.countDocuments({
-      role: 'DeptAdmin',
+    // Count total DeptHeads in this organization
+    const totalHeads = await User.countDocuments({
+      role: 'DeptHead',
       organization: orgId,
       isActive: true,
     });
@@ -63,7 +63,7 @@ exports.getOrgAdminStats = async (req, res) => {
 
     const summary = {
       totalDepartments: departments.length,
-      totalAdmins,
+      totalHeads,
       totalResolved: overall.resolved,
       totalPending: overall.pending,
     };

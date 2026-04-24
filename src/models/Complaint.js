@@ -13,11 +13,6 @@ const complaintSchema = new mongoose.Schema(
       required: [true, 'Description is required'],
       trim: true,
     },
-    category: {
-      type: String,
-      trim: true,
-      default: null,              
-    },
     location: {
       type: {
         type: String,

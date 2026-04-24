@@ -1,7 +1,8 @@
 openapi: 3.0.0
 info:
   title: AI-assisted Complaint Resolution System API
-  version: 3.0.0
+  version: 3.1.0
+  description: Role-based complaint management system with AI-powered features
 servers:
   - url: https://ai-complaint-backend-7xc5.onrender.com/api
     description: Production
@@ -35,7 +36,7 @@ components:
           type: string
         role:
           type: string
-          enum: [Citizen, DeptAdmin, OrgAdmin, SysAdmin]
+          enum: [Citizen, DeptHead, OrgAdmin, OrgHead, SysAdmin]
         organization:
           type: object
           properties:
@@ -52,6 +53,8 @@ components:
             name:
               type: string
           nullable: true
+        isActive:
+          type: boolean
         createdAt:
           type: string
           format: date-time
@@ -59,8 +62,6 @@ components:
           type: string
           format: date-time
           nullable: true
-        isActive:
-          type: boolean
 
     Organization:
       type: object
@@ -73,7 +74,6 @@ components:
           type: string
         isActive:
           type: boolean
-          default: true
         createdAt:
           type: string
           format: date-time
@@ -100,9 +100,11 @@ components:
               type: string
             name:
               type: string
+        head:
+          type: string
+          nullable: true
         isActive:
           type: boolean
-          default: true
         createdAt:
           type: string
           format: date-time
@@ -119,117 +121,22 @@ components:
           type: string
         description:
           type: string
-        category:
-          type: string
-          nullable: true
-        attachments:
-          type: array
-          items:
-            type: object
-            properties:
-              filename:
-                type: string
-              path:
-                type: string
-              uploadedAt:
-                type: string
-                format: date-time
-        location:
-          type: object
-          properties:
-            type:
-              type: string
-              enum: [Point]
-              default: Point
-            coordinates:
-              type: array
-              items:
-                type: number
-              minItems: 2
-              maxItems: 2
-            locationName:
-              type: string
-              nullable: true
-          nullable: true
-        submittedBy:
-          type: object
-          properties:
-            _id:
-              type: string
-            fullName:
-              type: string
-            email:
-              type: string
-        department:
-          type: object
-          nullable: true
-          properties:
-            _id:
-              type: string
-            name:
-              type: string
-            code:
-              type: string
-        assignedTo:
-          type: object
-          nullable: true
-          properties:
-            _id:
-              type: string
-            fullName:
-              type: string
-            email:
-              type: string
         status:
           type: string
-          enum: [Submitted, 'Manual Review', 'In Progress', Resolved, Rejected]
-          default: Submitted
+          enum: [Submitted, Manual Review, In Progress, Resolved, Rejected]
         priority:
           type: string
           enum: [Low, Medium, High, Critical]
-          default: Medium
         isSpam:
           type: boolean
-          default: false
-        aiConfidence:
-          type: number
-          minimum: 0
-          maximum: 1
-          nullable: true
-        duplicateOf:
-          type: string
-          nullable: true
-        overriddenFields:
+        department:
           type: object
-          additionalProperties:
-            type: boolean
-        history:
-          type: array
-          items:
-            type: object
-            properties:
-              action:
-                type: string
-              by:
-                type: object
-                properties:
-                  _id:
-                    type: string
-                  fullName:
-                    type: string
-              comment:
-                type: string
-              timestamp:
-                type: string
-                format: date-time
-        resolvedAt:
-          type: string
-          format: date-time
           nullable: true
+        submittedBy:
+          type: object
+        organization:
+          type: object
         createdAt:
-          type: string
-          format: date-time
-        updatedAt:
           type: string
           format: date-time
 
@@ -238,49 +145,11 @@ components:
       properties:
         _id:
           type: string
-        complaint:
+        commentText:
           type: string
         author:
           type: object
-          properties:
-            _id:
-              type: string
-            fullName:
-              type: string
-            email:
-              type: string
-        commentText:
-          type: string
         createdAt:
-          type: string
-          format: date-time
-        updatedAt:
-          type: string
-          format: date-time
-
-    Notification:
-      type: object
-      properties:
-        _id:
-          type: string
-        user:
-          type: string
-        type:
-          type: string
-          enum: [COMPLAINT_ASSIGNED, STATUS_UPDATED, COMMENT_ADDED, REVIEW_NEEDED]
-        title:
-          type: string
-        message:
-          type: string
-        data:
-          type: object
-          nullable: true
-        read:
-          type: boolean
-        createdAt:
-          type: string
-          format: date-time
-        updatedAt:
           type: string
           format: date-time
 
@@ -296,48 +165,6 @@ components:
         resolvedPercentage:
           type: integer
 
-    OrgAdminAnalytics:
-      type: object
-      properties:
-        departments:
-          type: array
-          items:
-            type: object
-            properties:
-              departmentId:
-                type: string
-              name:
-                type: string
-              total:
-                type: integer
-              resolved:
-                type: integer
-              pending:
-                type: integer
-              resolvedPercentage:
-                type: integer
-
-    SysAdminAnalytics:
-      type: object
-      properties:
-        organizations:
-          type: array
-          items:
-            type: object
-            properties:
-              organizationId:
-                type: string
-              name:
-                type: string
-              total:
-                type: integer
-              resolved:
-                type: integer
-              pending:
-                type: integer
-              resolvedPercentage:
-                type: integer
-
   responses:
     Unauthorized:
       description: Unauthorized
@@ -345,10 +172,6 @@ components:
       description: Forbidden
     NotFound:
       description: Not found
-    BadRequest:
-      description: Bad request
-    ServerError:
-      description: Server error
 
 paths:
   # ========== AUTHENTICATION ==========
@@ -370,16 +193,13 @@ paths:
                   type: string
                 password:
                   type: string
-                  minLength: 8
       responses:
         '201':
-          description: Registered
-        '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Registered successfully
 
   /auth/login:
     post:
-      summary: Login
+      summary: Login user
       tags: [Authentication]
       requestBody:
         required: true
@@ -395,92 +215,7 @@ paths:
                   type: string
       responses:
         '200':
-          description: Login success
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /auth/forgot-password:
-    post:
-      summary: Request password reset
-      tags: [Authentication]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email]
-              properties:
-                email:
-                  type: string
-      responses:
-        '200':
-          description: Reset link sent
-
-  /auth/reset-password:
-    post:
-      summary: Reset password with token
-      tags: [Authentication]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [token, email, password]
-              properties:
-                token:
-                  type: string
-                email:
-                  type: string
-                password:
-                  type: string
-                  minLength: 6
-      responses:
-        '200':
-          description: Password reset
-
-  /auth/forgot-password-otp:
-    post:
-      summary: Request OTP for password reset
-      tags: [Authentication]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email]
-              properties:
-                email:
-                  type: string
-      responses:
-        '200':
-          description: OTP sent
-
-  /auth/reset-password-otp:
-    post:
-      summary: Reset password with OTP
-      tags: [Authentication]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [email, otp, password]
-              properties:
-                email:
-                  type: string
-                otp:
-                  type: string
-                  pattern: '^[0-9]{6}$'
-                password:
-                  type: string
-                  minLength: 6
-      responses:
-        '200':
-          description: Password reset
+          description: Login successful
 
   /auth/profile:
     get:
@@ -490,90 +225,7 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: Profile
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /auth/change-password:
-    post:
-      summary: Change password
-      tags: [Authentication]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [oldPassword, newPassword]
-              properties:
-                oldPassword:
-                  type: string
-                newPassword:
-                  type: string
-      responses:
-        '200':
-          description: Changed
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  # ========== FILE UPLOADS ==========
-  /uploads:
-    post:
-      summary: Upload one or multiple files
-      tags: [File Upload]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              required: [files]
-              properties:
-                files:
-                  type: array
-                  items:
-                    type: string
-                    format: binary
-                  description: "Upload up to 5 files. Even for a single file, use 'files' key."
-                folder:
-                  type: string
-                  description: "Optional. Custom folder to store files in."
-                complaintId:
-                  type: string
-                  description: "Optional. Sets folder to complaints/{complaintId}."
-      responses:
-        '200':
-          description: Uploaded successfully
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-    delete:
-      summary: Delete a file from S3
-      tags: [File Upload]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [fileKey]
-              properties:
-                fileKey:
-                  type: string
-      responses:
-        '200':
-          description: Deleted
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+          description: User profile
 
   # ========== USER MANAGEMENT ==========
   /users/org-admins:
@@ -600,9 +252,7 @@ paths:
                   type: string
       responses:
         '201':
-          description: Created
-        '403':
-          $ref: '#/components/responses/Forbidden'
+          description: OrgAdmin created
     get:
       summary: List OrgAdmins (SysAdmin only)
       tags: [Users]
@@ -610,11 +260,11 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: List
+          description: List of OrgAdmins
 
   /users/org-admins/{id}:
     put:
-      summary: Update OrgAdmin
+      summary: Update OrgAdmin (SysAdmin only)
       tags: [Users]
       security:
         - bearerAuth: []
@@ -634,13 +284,15 @@ paths:
                   type: string
                 email:
                   type: string
+                isActive:
+                  type: boolean
       responses:
         '200':
-          description: Updated
+          description: OrgAdmin updated
 
   /users/org-admins/{id}/deactivate:
     put:
-      summary: Deactivate OrgAdmin
+      summary: Deactivate OrgAdmin (SysAdmin only)
       tags: [Users]
       security:
         - bearerAuth: []
@@ -652,11 +304,91 @@ paths:
             type: string
       responses:
         '200':
-          description: Deactivated
+          description: OrgAdmin deactivated
 
-  /users/dept-admins:
+  /users/org-heads:
     post:
-      summary: Create DeptAdmin (OrgAdmin only)
+      summary: Create OrgHead (SysAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName, email, password, organizationId]
+              properties:
+                fullName:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                organizationId:
+                  type: string
+      responses:
+        '201':
+          description: OrgHead created
+    get:
+      summary: List OrgHeads (SysAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of OrgHeads
+
+  /users/org-heads/{id}:
+    put:
+      summary: Update OrgHead (SysAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                email:
+                  type: string
+                organizationId:
+                  type: string
+                isActive:
+                  type: boolean
+      responses:
+        '200':
+          description: OrgHead updated
+
+  /users/org-heads/{id}/deactivate:
+    put:
+      summary: Deactivate OrgHead (SysAdmin only)
+      tags: [Users]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OrgHead deactivated
+
+  /users/dept-heads:
+    post:
+      summary: Create DeptHead (OrgAdmin only)
       tags: [Users]
       security:
         - bearerAuth: []
@@ -678,19 +410,19 @@ paths:
                   type: string
       responses:
         '201':
-          description: Created
+          description: DeptHead created
     get:
-      summary: List DeptAdmins (OrgAdmin only)
+      summary: List DeptHeads (OrgAdmin, OrgHead)
       tags: [Users]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: List
+          description: List of DeptHeads
 
-  /users/dept-admins/{id}:
+  /users/dept-heads/{id}:
     put:
-      summary: Update DeptAdmin
+      summary: Update DeptHead (OrgAdmin only)
       tags: [Users]
       security:
         - bearerAuth: []
@@ -712,13 +444,15 @@ paths:
                   type: string
                 departmentId:
                   type: string
+                isActive:
+                  type: boolean
       responses:
         '200':
-          description: Updated
+          description: DeptHead updated
 
-  /users/dept-admins/{id}/deactivate:
+  /users/dept-heads/{id}/deactivate:
     put:
-      summary: Deactivate DeptAdmin
+      summary: Deactivate DeptHead (OrgAdmin only)
       tags: [Users]
       security:
         - bearerAuth: []
@@ -730,7 +464,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Deactivated
+          description: DeptHead deactivated
 
   # ========== ORGANIZATIONS ==========
   /organizations:
@@ -753,7 +487,7 @@ paths:
                   type: string
       responses:
         '201':
-          description: Created
+          description: Organization created
     get:
       summary: List organizations (SysAdmin only)
       tags: [Organizations]
@@ -761,7 +495,7 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: List
+          description: List of organizations
 
   /organizations/citizen-list:
     get:
@@ -771,11 +505,11 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: List of { _id, name }
+          description: List of active organizations
 
   /organizations/{id}:
     put:
-      summary: Update organization
+      summary: Update organization (SysAdmin only)
       tags: [Organizations]
       security:
         - bearerAuth: []
@@ -799,11 +533,11 @@ paths:
                   type: boolean
       responses:
         '200':
-          description: Updated
+          description: Organization updated
 
   /organizations/{id}/deactivate:
     put:
-      summary: Deactivate organization
+      summary: Deactivate organization (SysAdmin only)
       tags: [Organizations]
       security:
         - bearerAuth: []
@@ -815,7 +549,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Deactivated
+          description: Organization deactivated
 
   # ========== DEPARTMENTS ==========
   /departments:
@@ -840,19 +574,19 @@ paths:
                   type: string
       responses:
         '201':
-          description: Created
+          description: Department created
     get:
-      summary: List departments (OrgAdmin only)
+      summary: List departments (OrgAdmin, OrgHead)
       tags: [Departments]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: List
+          description: List of departments
 
   /departments/{id}:
     put:
-      summary: Update department
+      summary: Update department (OrgAdmin only)
       tags: [Departments]
       security:
         - bearerAuth: []
@@ -876,11 +610,11 @@ paths:
                   type: string
       responses:
         '200':
-          description: Updated
+          description: Department updated
 
   /departments/{id}/deactivate:
     put:
-      summary: Deactivate department
+      summary: Deactivate department (OrgAdmin only)
       tags: [Departments]
       security:
         - bearerAuth: []
@@ -892,12 +626,12 @@ paths:
             type: string
       responses:
         '200':
-          description: Deactivated
+          description: Department deactivated
 
   # ========== COMPLAINTS ==========
   /complaints:
     post:
-      summary: Submit a complaint (Citizen)
+      summary: Submit complaint (Citizen)
       tags: [Complaints]
       security:
         - bearerAuth: []
@@ -913,43 +647,36 @@ paths:
                   type: string
                 description:
                   type: string
+                organizationId:
+                  type: string
                 attachments:
                   type: array
                   items:
                     type: object
-                    required: [url]
                     properties:
                       url:
                         type: string
                 latitude:
                   type: number
-                  nullable: true
                 longitude:
                   type: number
-                  nullable: true
-                organizationId:
-                  type: string
       responses:
         '201':
-          description: Created
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+          description: Complaint submitted
 
   /complaints/my-complaints:
     get:
-      summary: Get citizen's complaints
+      summary: Get my complaints (Citizen)
       tags: [Complaints]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: List of complaints
+          description: List of user's complaints
 
   /complaints/assigned:
     get:
-      summary: Get complaints assigned to DeptAdmin
+      summary: Get assigned complaints (DeptHead)
       tags: [Complaints]
       security:
         - bearerAuth: []
@@ -959,17 +686,17 @@ paths:
 
   /complaints/organization:
     get:
-      summary: Get all complaints in organization (OrgAdmin)
+      summary: Get organization complaints (OrgHead)
       tags: [Complaints]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: List of complaints
+          description: List of organization complaints
 
   /complaints/{id}/status:
     put:
-      summary: Update complaint status (DeptAdmin)
+      summary: Update complaint status (DeptHead)
       tags: [Complaints]
       security:
         - bearerAuth: []
@@ -989,16 +716,14 @@ paths:
               properties:
                 status:
                   type: string
-                  enum: ['In Progress', 'Resolved']
+                  enum: [In Progress, Resolved]
       responses:
         '200':
-          description: Updated
-        '403':
-          $ref: '#/components/responses/Forbidden'
+          description: Status updated
 
   /complaints/{id}/override:
     put:
-      summary: Override AI assignment (OrgAdmin)
+      summary: Override complaint (OrgHead)
       tags: [Complaints]
       security:
         - bearerAuth: []
@@ -1021,42 +746,18 @@ paths:
                   enum: [Low, Medium, High, Critical]
                 status:
                   type: string
-                  enum: [Submitted, 'Manual Review', 'In Progress', Resolved, Rejected]
+                  enum: [Submitted, Manual Review, In Progress, Resolved, Rejected]
                 isSpam:
                   type: boolean
-                duplicateOf:
-                  type: string
                 comment:
                   type: string
       responses:
         '200':
           description: Override successful
-        '403':
-          $ref: '#/components/responses/Forbidden'
-
-  /ai/moderate:
-    post:
-      summary: Run AI moderation on a complaint
-      tags: [AI]
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [complaintId]
-              properties:
-                complaintId:
-                  type: string
-      responses:
-        '200':
-          description: Completed
 
   /complaints/{id}/comments:
     post:
-      summary: Add a comment
+      summary: Add comment (DeptHead, OrgHead)
       tags: [Comments]
       security:
         - bearerAuth: []
@@ -1080,7 +781,7 @@ paths:
         '201':
           description: Comment added
     get:
-      summary: Get comments
+      summary: Get comments (DeptHead, OrgHead)
       tags: [Comments]
       security:
         - bearerAuth: []
@@ -1093,6 +794,27 @@ paths:
       responses:
         '200':
           description: List of comments
+
+  # ========== AI MODERATION ==========
+  /ai/moderate:
+    post:
+      summary: Run AI moderation on complaint
+      tags: [AI]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [complaintId]
+              properties:
+                complaintId:
+                  type: string
+      responses:
+        '200':
+          description: AI moderation completed
 
   # ========== NOTIFICATIONS ==========
   /notifications:
@@ -1119,7 +841,7 @@ paths:
             type: string
       responses:
         '200':
-          description: Marked as read
+          description: Notification marked as read
 
   /notifications/read-all:
     put:
@@ -1129,38 +851,38 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: All marked read
+          description: All notifications marked as read
 
   # ========== ANALYTICS ==========
-  /analytics/dept-admin:
+  /analytics/dept-head:
     get:
-      summary: DeptAdmin dashboard stats
+      summary: DeptHead dashboard stats
       tags: [Analytics]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Summary stats
+          description: Department statistics
 
-  /analytics/org-admin:
+  /analytics/org-head:
     get:
-      summary: OrgAdmin dashboard stats by department
+      summary: OrgHead dashboard stats
       tags: [Analytics]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Department breakdown
+          description: Organization statistics
 
   /analytics/sys-admin:
     get:
-      summary: SysAdmin dashboard stats by organization
+      summary: SysAdmin dashboard stats
       tags: [Analytics]
       security:
         - bearerAuth: []
       responses:
         '200':
-          description: Organization breakdown
+          description: System-wide statistics
 
   /analytics/citizen:
     get:
@@ -1170,4 +892,4 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: Summary stats
+          description: Personal complaint statistics

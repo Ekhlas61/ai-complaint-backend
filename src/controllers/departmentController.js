@@ -50,7 +50,7 @@ exports.createDepartment = async (req, res) => {
 };
 
 // ────────────────────────────────────────────────
-// OrgAdmin: List all active departments (only for their organization)
+// OrgAdmin & OrgHead: List all active departments (only for their organization)
 // ────────────────────────────────────────────────
 exports.getDepartments = async (req, res) => {
   try {

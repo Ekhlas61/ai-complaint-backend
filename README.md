@@ -1,65 +1,131 @@
+# AI-Assisted Complaint Resolution System - Backend API
 
-PROJECT NAME : AI-Assisted Complaint Resolution System- Backend API
+## Overview
 
-OVERVIEW
+This is the backend API for the AI-Assisted Complaint Resolution System, a role-based platform that enables utility service organizations to address complaints submitted by citizens efficiently and in a timely manner.
 
-This is the backend API for the  AI-Assisted Complaint Resolution System, which is a role-based platform that enables utility service organizations to address complaints submited by citizens efficiently and in a timely manner. 
+## Main Features
 
-Main Features
+- **Role-based access control**: Citizens, DeptHeads, OrgAdmins, OrgHeads, SysAdmin
 
-- Role-based access control: Citizens, DeptAdmins, OrgAdmins, SysAdmin.
+### Role Capabilities
 
--Citizen:
-  - Self-register and login
-  - Submit Complaints
-  - View their own complaints and status
+#### Citizen:
+- Self-register and login
+- Submit complaints
+- View their own complaints and status
 
-- DeptAdmin:
-  - View complaints assigned to them
-  - Update complaint status. for instance, change status from pending to resolved.
-  - Add Comments
-  - View Dashboard with their assigned complaints and performance metrics
+#### DeptHead (Department Head):
+- View complaints assigned to their department
+- Update complaint status (e.g., change status from "Submitted" to "In Progress" or "Resolved")
+- Add comments on complaints
+- View dashboard with assigned complaints and performance metrics
 
-- OrgAdmin: 
-  - Create Departments within their organization
-  - Manage departments(update, deactivate)
-  - Create DeptAdmins and assign them to departments
-  - View organization-wide analytics, such as complaints per department.
-  - Assign complaints to departments or DeptAdmins
+#### OrgAdmin (Organization Administrator):
+- Create departments within their organization
+- Manage departments (update, deactivate)
+- Create DeptHeads and assign them to departments
+- Manage DeptHead accounts (update, deactivate)
+- View organization-wide analytics and complaints per department
 
--SysAdmin:
-  - Create organizations (EEP,AAWSA, etc.)
-  - Manage organizations(update, deactivate)
-  - Create OrgAdmins
-  - View global analytics for decision-making
+#### OrgHead (Organization Head):
+- View all complaints within their organization
+- View department listings (read-only)
+- View DeptHead listings (read-only)
+- Perform admin overrides on complaints (reassign departments, update priority, mark as spam)
+- Add comments on complaints
+- View organization-wide analytics for strategic decision-making
 
-- Notifications :  Email, In-app 
-- AI integration for auto-assignment, spam/duplicate detection, and priority suggestions.
+#### SysAdmin (System Administrator):
+- Create organizations
+- Manage organizations (update, deactivate)
+- Create OrgAdmins and OrgHeads
+- Manage OrgAdmin and OrgHead accounts (update, deactivate)
+- View global analytics for decision-making
 
+### Additional Features
 
-Tech Stack
+- **Notifications**: Email and in-app notifications for status updates and comments
+- **AI Integration**: Auto-assignment, spam/duplicate detection, and priority suggestions
+- **Audit Logging**: Track all important actions across the system
+- **Comments System**: Secure communication between DeptHeads and OrgHeads
 
-- Node.js
-- Express
-- MongoDB 
-- JSON Web Tokens(JWT) for authentication
-- bcryptjs for password hashing
-- dotenb for environment variables
-- cors for cross-orgin requests
-- swagger-ui-express and YAML for API documentation
-- express-async-handler for async error handling
+## Tech Stack
 
-Prerequisites
+- **Node.js** - JavaScript runtime
+- **Express** - Web framework
+- **MongoDB** - Database
+- **JSON Web Tokens (JWT)** - Authentication
+- **bcryptjs** - Password hashing
+- **dotenv** - Environment variables
+- **cors** - Cross-origin requests
+- **swagger-ui-express & YAML** - API documentation
+- **express-async-handler** - Async error handling
 
-- Node.js
-- MongoDB(local or Atlas)
+## Prerequisites
+
+- Node.js (v14 or higher)
+- MongoDB (local or Atlas)
 - Git
+
+## Installation
+
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd ai-complaint-backend
+
+2. Install dependencies:
+  ```bash
+   npm install
+
+3. Create a .env file in the root directory: 
+
+    PORT=5000
+    MONGODB_URI=your_mongodb_connection_string
+    JWT_SECRET=your_jwt_secret_key
+    JWT_EXPIRE=30d
+    EMAIL_HOST=your_smtp_host
+    EMAIL_PORT=587
+    EMAIL_USER=your_email
+    EMAIL_PASS=your_email_password
+
+4. Run the application: 
+  # Development mode
+npm run dev
+
+# Production mode
+npm start
 
 
 API Documentation
 
-Once the server starts to run, you can view the Swagger documentaition with all the endpoints at:
+Once the server starts running, you can view the Swagger documentation with all the endpoints at:
 
-  - Local: http://localhost:5000/api-docs
-  
-  - Production: https://ai-complaint-backend-7xc5.onrender.com/api
+Local: http://localhost:5000/api-docs
+
+Production: https://ai-complaint-backend-7xc5.onrender.com/api-
+
+
+Project Structure
+
+ai-complaint-backend/
+├── controllers/      # Route controllers
+├── models/          # Database models
+├── routes/          # API routes
+├── middleware/      # Custom middleware 
+├── config/          # Configuration files
+├── utils/           # Utility functions
+├── docs/            # API documentation
+├── .env             # Environment variables
+├── .gitignore       # Git ignore file
+├── package.json     # Dependencies
+└── server.js        # Entry point
+
+Deployment
+
+The API is deployed on Render and can be accessed at:
+
+Base URL: https://ai-complaint-backend-7xc5.onrender.com
+
+API Docs: https://ai-complaint-backend-7xc5.onrender.com/api-docs
