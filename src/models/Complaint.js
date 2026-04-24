@@ -73,7 +73,6 @@ const complaintSchema = new mongoose.Schema(
       enum: ['Low', 'Medium', 'High', 'Critical'],
       default: 'Medium',
     },
-    // Track which AI fields have been manually overridden
     overriddenFields: {
       type: Map,
       of: Boolean,
@@ -87,11 +86,6 @@ const complaintSchema = new mongoose.Schema(
         timestamp: { type: Date, default: Date.now },
       },
     ],
-    syncStatus: {
-      type: String,
-      enum: ['Pending', 'Synced', 'Failed'],
-      default: 'Pending',
-    },
     attachments: [                   
       {
         filename:{type: String, default:'image' },
@@ -99,10 +93,7 @@ const complaintSchema = new mongoose.Schema(
         uploadedAt: { type: Date, default: Date.now },
       },
     ],
-    deviceInfo: {
-      type: String,
-      trim: true,
-    },
+   
     resolvedAt: Date,
   },
   { timestamps: true }

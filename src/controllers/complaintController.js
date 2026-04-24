@@ -118,13 +118,48 @@ async function moderateComplaintAsync(complaintId) {
 }
 
 // Get my complaints by Citizen role
+// Get my complaints by Citizen role
 exports.getMyComplaints = async (req, res) => {
   try {
     const complaints = await Complaint.find({ submittedBy: req.user._id })
-      .populate('department', 'name')
+      .populate('organization', 'name')
       .sort({ createdAt: -1 });
-    res.json(complaints);
+    
+    // Format the response for citizens
+    const formattedComplaints = complaints.map(complaint => {
+      // Check if location has valid coordinates (not [0,0])
+      const hasValidLocation = complaint.location && 
+                               complaint.location.coordinates && 
+                               complaint.location.coordinates[0] !== 0 && 
+                               complaint.location.coordinates[1] !== 0;
+      
+      return {
+        id: complaint._id,
+        title: complaint.title,
+        description: complaint.description,
+        status: complaint.status,
+        createdAt: complaint.createdAt,
+        updatedAt: complaint.updatedAt,
+        resolvedAt: complaint.resolvedAt || null,
+        organization: complaint.organization?.name || 'Unknown',
+        location: hasValidLocation ? {
+          latitude: complaint.location.coordinates[1],
+          longitude: complaint.location.coordinates[0],
+          locationName: complaint.location.locationName || null
+        } : null,
+        attachments: complaint.attachments && complaint.attachments.length > 0 
+          ? complaint.attachments.map(att => ({
+              url: att.path,
+              filename: att.filename || 'image',
+              uploadedAt: att.uploadedAt
+            }))
+          : []
+      };
+    });
+    
+    res.json(formattedComplaints);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 };
