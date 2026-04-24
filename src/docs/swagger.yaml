@@ -227,6 +227,132 @@ paths:
         '200':
           description: User profile
 
+  /auth/change-password:
+    post:
+      summary: Change password (authenticated users)
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [oldPassword, newPassword]
+              properties:
+                oldPassword:
+                  type: string
+                newPassword:
+                  type: string
+                  minLength: 6
+      responses:
+        '200':
+          description: Password changed successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/forgot-password:
+    post:
+      summary: Request password reset (sends email with token)
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+      responses:
+        '200':
+          description: Reset link sent to email
+        '404':
+          description: User not found
+
+  /auth/reset-password:
+    post:
+      summary: Reset password with token
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, email, password]
+              properties:
+                token:
+                  type: string
+                email:
+                  type: string
+                password:
+                  type: string
+                  minLength: 6
+      responses:
+        '200':
+          description: Password reset successfully
+        '400':
+          description: Invalid or expired token
+
+  /auth/forgot-password-otp:
+    post:
+      summary: Request OTP for password reset
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+      responses:
+        '200':
+          description: OTP sent to email
+        '404':
+          description: User not found
+
+  /auth/reset-password-otp:
+    post:
+      summary: Reset password with OTP
+      tags: [Authentication]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp, password]
+              properties:
+                email:
+                  type: string
+                otp:
+                  type: string
+                  pattern: '^[0-9]{6}$'
+                password:
+                  type: string
+                  minLength: 6
+      responses:
+        '200':
+          description: Password reset successfully
+        '400':
+          description: Invalid OTP
+
+  /auth/logout:
+    post:
+      summary: Logout current user
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out successfully
+
   # ========== USER MANAGEMENT ==========
   /users/org-admins:
     post:
@@ -268,51 +394,12 @@ paths:
       tags: [Users]
       security:
         - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [oldPassword, newPassword]
-              properties:
-                oldPassword:
-                  type: string
-                newPassword:
-                  type: string
-      responses:
-        '200':
-          description: Changed
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  /auth/logout:
-    post:
-      summary: Logout current user
-      tags: [Authentication]
-      security:
-        - bearerAuth: []
-      responses:
-        '200':
-          description: Logged out successfully
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    example: Logged out successfully
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-
-  # ========== FILE UPLOADS ==========
-  /uploads:
-    post:
-      summary: Upload one or multiple files
-      tags: [File Upload]
-      security:
-        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
       requestBody:
         content:
           application/json:
@@ -504,6 +591,68 @@ paths:
       responses:
         '200':
           description: DeptHead deactivated
+
+  # ========== FILE UPLOADS ==========
+  /uploads:
+    post:
+      summary: Upload one or multiple files
+      tags: [File Upload]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - files
+              properties:
+                files:
+                  type: array
+                  items:
+                    type: string
+                    format: binary
+                folder:
+                  type: string
+                  description: Optional folder name
+                complaintId:
+                  type: string
+                  description: Optional complaint ID
+      responses:
+        '200':
+          description: Files uploaded successfully
+        '400':
+          description: Bad request
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /uploads:
+    delete:
+      summary: Delete a file from S3
+      tags: [File Upload]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fileKey]
+              properties:
+                fileKey:
+                  type: string
+                  description: The file key/path to delete
+      responses:
+        '200':
+          description: File deleted successfully
+        '400':
+          description: Bad request
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: File not found
 
   # ========== ORGANIZATIONS ==========
   /organizations:
