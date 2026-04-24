@@ -596,6 +596,7 @@ paths:
   /uploads:
     post:
       summary: Upload one or multiple files
+      description: Upload files to S3 storage. Supports single or multiple files.
       tags: [File Upload]
       security:
         - bearerAuth: []
@@ -613,23 +614,57 @@ paths:
                   items:
                     type: string
                     format: binary
+                  description: One or more files to upload
                 folder:
                   type: string
-                  description: Optional folder name
+                  description: Optional custom folder name (will override complaintId folder)
                 complaintId:
                   type: string
-                  description: Optional complaint ID
+                  description: Optional complaint ID - files will be stored in complaints/{complaintId} folder
       responses:
         '200':
           description: Files uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: File(s) uploaded successfully
+                  files:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        url:
+                          type: string
+                          example: https://s3-bucket-url.com/complaints/123/file.pdf
+                        key:
+                          type: string
+                          example: complaints/123/file.pdf
+                        originalName:
+                          type: string
+                          example: document.pdf
+                        size:
+                          type: integer
+                          example: 1024000
+                        mimetype:
+                          type: string
+                          example: application/pdf
+                  urls:
+                    type: array
+                    items:
+                      type: string
         '400':
-          description: Bad request
+          description: No file provided
         '401':
           $ref: '#/components/responses/Unauthorized'
-
-  /uploads:
+        '500':
+          description: Upload failed
     delete:
-      summary: Delete a file from S3
+      summary: Delete a file from storage
+      description: Delete a file from S3 storage using its file key
       tags: [File Upload]
       security:
         - bearerAuth: []
@@ -643,16 +678,27 @@ paths:
               properties:
                 fileKey:
                   type: string
-                  description: The file key/path to delete
+                  description: The file key/path to delete (e.g., "complaints/123/file.pdf")
+                  example: complaints/123/file.pdf
       responses:
         '200':
           description: File deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: File deleted successfully
         '400':
-          description: Bad request
+          description: File key is required
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: File not found
+        '500':
+          description: Delete failed
 
   # ========== ORGANIZATIONS ==========
   /organizations:
