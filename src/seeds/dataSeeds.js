@@ -37,7 +37,7 @@ const seedAll = async () => {
       aawsa: { id: aawsaOrg._id, name: aawsaOrg.name },
     });
 
-    // ========== CREATE SYSMIN ==========
+    // ========== CREATE SYSADMIN ==========
     const sysAdmin = await User.findOneAndUpdate(
       { email: 'sysadmin@complaint.gov' },
       {
@@ -55,12 +55,12 @@ const seedAll = async () => {
     // ========== CREATE ORGADMINS (one per organization) ==========
     const orgAdminsData = [
       {
-        email: 'admin@eep.com.et',
+        email: 'orgadmin@eep.com.et',
         fullName: 'EEP Organization Admin',
         organization: eepOrg._id,
       },
       {
-        email: 'admin@aawsa.gov.et',
+        email: 'orgadmin@aawsa.gov.et',
         fullName: 'AAWSA Organization Admin',
         organization: aawsaOrg._id,
       },
@@ -94,7 +94,52 @@ const seedAll = async () => {
       console.log(`OrgAdmin seeded: ${admin.email} (org: ${admin.organization})`);
     }
 
-    //CREATE DEPARTMENTS  
+    // ========== CREATE ORGHEADS (one per organization) ==========
+    const orgHeadsData = [
+      {
+        email: 'orghead@eep.com.et',
+        fullName: 'EEP Organization Head',
+        organization: eepOrg._id,
+      },
+      {
+        email: 'orghead@aawsa.gov.et',
+        fullName: 'AAWSA Organization Head',
+        organization: aawsaOrg._id,
+      },
+    ];
+
+    const orgHeads = [];
+    for (const data of orgHeadsData) {
+      const existing = await User.findOne({ 
+        organization: data.organization, 
+        role: 'OrgHead', 
+        isActive: true 
+      });
+      if (existing && existing.email !== data.email) {
+        console.warn(`OrgHead for organization ${data.organization} already exists: ${existing.email}. Skipping ${data.email}`);
+        continue;
+      }
+      const head = await User.findOneAndUpdate(
+        { email: data.email },
+        {
+          fullName: data.fullName,
+          email: data.email,
+          passwordHash,
+          role: 'OrgHead',
+          loginMethod: 'manual',
+          isActive: true,
+          organization: data.organization,
+        },
+        { upsert: true, new: true }
+      );
+      orgHeads.push(head);
+      console.log(`OrgHead seeded: ${head.email} (org: ${head.organization})`);
+      
+      // Set organization head to this OrgHead
+      await Organization.findByIdAndUpdate(data.organization, { head: head._id });
+    }
+
+    // ========== CREATE DEPARTMENTS ==========
     
     // AAWSA departments
     const aawsaDepartments = [
@@ -180,16 +225,16 @@ const seedAll = async () => {
       console.log(`Department seeded: ${dept.code} (${dept.name})`);
     }
 
-    // ========== CREATE DEPTADMINS (one per department) ==========
-    const deptAdminsData = [
-      // AAWSA DeptAdmins
+    // ========== CREATE DEPTHEADS (one per department) ==========
+    const deptHeadsData = [
+      // AAWSA DeptHeads
       { fullName: 'Ayele Water Supply', email: 'water.supply@aawsa.gov.et', departmentCode: 'WATER_SUPPLY', org: aawsaOrg },
       { fullName: 'Bekele Water Quality', email: 'water.quality@aawsa.gov.et', departmentCode: 'WATER_QUALITY', org: aawsaOrg },
       { fullName: 'Chala Pipe Maintenance', email: 'pipe.maintenance@aawsa.gov.et', departmentCode: 'PIPE_MAINTENANCE', org: aawsaOrg },
       { fullName: 'Desta Sewerage', email: 'sewerage@aawsa.gov.et', departmentCode: 'SEWERAGE', org: aawsaOrg },
       { fullName: 'Eshetu Meter Service', email: 'meter.service.aawsa@aawsa.gov.et', departmentCode: 'METER_SERVICE_AAWSA', org: aawsaOrg },
       { fullName: 'Fikru Customer Service', email: 'customer.service.aawsa@aawsa.gov.et', departmentCode: 'CUSTOMER_SERVICE_AAWSA', org: aawsaOrg },
-      // EEP DeptAdmins
+      // EEP DeptHeads
       { fullName: 'Girma Power Outage', email: 'power.outage@eep.com.et', departmentCode: 'POWER_OUTAGE', org: eepOrg },
       { fullName: 'Hana Safety Emergency', email: 'safety.emergency@eep.com.et', departmentCode: 'SAFETY_EMERGENCY', org: eepOrg },
       { fullName: 'Ibrahim Transformer', email: 'transformer.issue@eep.com.et', departmentCode: 'TRANSFORMER_ISSUE', org: eepOrg },
@@ -198,43 +243,51 @@ const seedAll = async () => {
       { fullName: 'Lemlem Customer Service', email: 'customer.service.eep@eep.com.et', departmentCode: 'CUSTOMER_SERVICE_EEP', org: eepOrg },
     ];
 
-    for (const adminData of deptAdminsData) {
-      const department = createdDepts[adminData.departmentCode];
+    for (const headData of deptHeadsData) {
+      const department = createdDepts[headData.departmentCode];
       if (!department) {
-        console.error(`Department ${adminData.departmentCode} not found – skipping user ${adminData.email}`);
+        console.error(`Department ${headData.departmentCode} not found – skipping user ${headData.email}`);
         continue;
       }
 
-      const existingDeptAdmin = await User.findOne({
+      const existingDeptHead = await User.findOne({
         department: department._id,
-        role: 'DeptAdmin',
+        role: 'DeptHead',
         isActive: true,
       });
-      if (existingDeptAdmin && existingDeptAdmin.email !== adminData.email) {
-        console.warn(`DeptAdmin for department ${department.code} already exists: ${existingDeptAdmin.email}. Skipping ${adminData.email}`);
+      if (existingDeptHead && existingDeptHead.email !== headData.email) {
+        console.warn(`DeptHead for department ${department.code} already exists: ${existingDeptHead.email}. Skipping ${headData.email}`);
         continue;
       }
 
       const user = await User.findOneAndUpdate(
-        { email: adminData.email },
+        { email: headData.email },
         {
-          fullName: adminData.fullName,
-          email: adminData.email,
+          fullName: headData.fullName,
+          email: headData.email,
           passwordHash,
-          role: 'DeptAdmin',
+          role: 'DeptHead',
           loginMethod: 'manual',
           isActive: true,
-          organization: adminData.org._id,
+          organization: headData.org._id,
           department: department._id,
         },
         { upsert: true, new: true }
       );
-      console.log(`DeptAdmin seeded: ${user.email} (dept: ${department.code})`);
+      console.log(`DeptHead seeded: ${user.email} (dept: ${department.code})`);
 
+      // Set department head to this DeptHead
       await Department.findByIdAndUpdate(department._id, { head: user._id });
     }
 
     console.log('\n✅ Seeding completed successfully.');
+    console.log('Seeded users summary:');
+    console.log(`- SysAdmin: 1`);
+    console.log(`- OrgAdmins: ${orgAdmins.length}`);
+    console.log(`- OrgHeads: ${orgHeads.length}`);
+    console.log(`- DeptHeads: ${deptHeadsData.length}`);
+    console.log(`- Total users: ${1 + orgAdmins.length + orgHeads.length + deptHeadsData.length}`);
+    
     process.exit(0);
   } catch (error) {
     console.error('Seeding error:', error);

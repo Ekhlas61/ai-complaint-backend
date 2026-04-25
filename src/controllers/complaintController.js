@@ -9,14 +9,14 @@ const Organization = require('../models/Organization');
 async function notifyCommentParticipants(complaint, commentAuthor, commentText) {
   const participants = [];
 
-  if (commentAuthor.role === 'DeptAdmin') {
-    const orgAdmins = await User.find({ 
+  if (commentAuthor.role === 'DeptHead') {
+    const orgHeads = await User.find({ 
       organization: complaint.organization, 
-      role: 'OrgAdmin' 
+      role: 'OrgHead' 
     }).select('_id');
-    participants.push(...orgAdmins.map(admin => admin._id));
+    participants.push(...orgHeads.map(head => head._id));
   } 
-  else if (commentAuthor.role === 'OrgAdmin') {
+  else if (commentAuthor.role === 'OrgHead') {
     if (complaint.assignedTo) {
       participants.push(complaint.assignedTo);
     }
@@ -39,7 +39,6 @@ async function notifyCommentParticipants(complaint, commentAuthor, commentText) 
 
   await Notification.insertMany(notifications);
 }
-
 
 // Submit new complaint for Citizen role
 exports.createComplaint = async (req, res) => {
@@ -107,6 +106,7 @@ exports.createComplaint = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
 // Async wrapper for AI moderation called after complaint is submitted
 async function moderateComplaintAsync(complaintId) {
   const req = { body: { complaintId } };
@@ -118,18 +118,53 @@ async function moderateComplaintAsync(complaintId) {
 }
 
 // Get my complaints by Citizen role
+// Get my complaints by Citizen role
 exports.getMyComplaints = async (req, res) => {
   try {
     const complaints = await Complaint.find({ submittedBy: req.user._id })
-      .populate('department', 'name')
+      .populate('organization', 'name')
       .sort({ createdAt: -1 });
-    res.json(complaints);
+    
+    // Format the response for citizens
+    const formattedComplaints = complaints.map(complaint => {
+      // Check if location has valid coordinates (not [0,0])
+      const hasValidLocation = complaint.location && 
+                               complaint.location.coordinates && 
+                               complaint.location.coordinates[0] !== 0 && 
+                               complaint.location.coordinates[1] !== 0;
+      
+      return {
+        id: complaint._id,
+        title: complaint.title,
+        description: complaint.description,
+        status: complaint.status,
+        createdAt: complaint.createdAt,
+        updatedAt: complaint.updatedAt,
+        resolvedAt: complaint.resolvedAt || null,
+        organization: complaint.organization?.name || 'Unknown',
+        location: hasValidLocation ? {
+          latitude: complaint.location.coordinates[1],
+          longitude: complaint.location.coordinates[0],
+          locationName: complaint.location.locationName || null
+        } : null,
+        attachments: complaint.attachments && complaint.attachments.length > 0 
+          ? complaint.attachments.map(att => ({
+              url: att.path,
+              filename: att.filename || 'image',
+              uploadedAt: att.uploadedAt
+            }))
+          : []
+      };
+    });
+    
+    res.json(formattedComplaints);
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: err.message });
   }
 };
 
-// Add comment endpoint
+// Add comment endpoint - Only DeptHead and OrgHead can comment
 exports.addComment = async (req, res) => {
   try {
     const { commentText } = req.body;
@@ -139,16 +174,16 @@ exports.addComment = async (req, res) => {
 
     const complaint = await Complaint.findById(req.params.id);
     if (!complaint) {
-      return res.status(404). json({ message: 'Complaint not found' });
+      return res.status(404).json({ message: 'Complaint not found' });
     }
 
-    const isDeptAdmin = req.user.role === 'DeptAdmin' && 
+    const isDeptHead = req.user.role === 'DeptHead' && 
                         complaint.department && 
                         complaint.department.toString() === req.user.department?.toString();
-    const isOrgAdmin = req.user.role === 'OrgAdmin';
+    const isOrgHead = req.user.role === 'OrgHead';
 
-    if (!isDeptAdmin && !isOrgAdmin) {
-      return res.status(403).json({ message: 'Not authorized to comment on this complaint' });
+    if (!isDeptHead && !isOrgHead) {
+      return res.status(403).json({ message: 'Not authorized to comment on this complaint. Only DeptHead and OrgHead can communicate.' });
     }
 
     const comment = await Comment.create({
@@ -174,7 +209,7 @@ exports.addComment = async (req, res) => {
   }
 };
 
-// Get comments with permission check
+// Get comments with permission check - Only DeptHead and OrgHead can view comments
 exports.getComments = async (req, res) => {
   try {
     const complaint = await Complaint.findById(req.params.id).select('submittedBy assignedTo department');
@@ -182,12 +217,12 @@ exports.getComments = async (req, res) => {
       return res.status(404).json({ message: 'Complaint not found' });
     }
 
-    const isDeptAdmin = req.user.role === 'DeptAdmin' && 
+    const isDeptHead = req.user.role === 'DeptHead' && 
                         complaint.department && 
                         complaint.department.toString() === req.user.department?.toString();
-    const isOrgAdmin = req.user.role === 'OrgAdmin';
+    const isOrgHead = req.user.role === 'OrgHead';
 
-    if (!isDeptAdmin && !isOrgAdmin) {
+    if (!isDeptHead && !isOrgHead) {
       return res.status(403).json({ message: 'Not authorized to view comments on this complaint' });
     }
 
@@ -201,12 +236,12 @@ exports.getComments = async (req, res) => {
   }
 };
 
-// Get assigned complaints for DeptAdmin role
+// Get assigned complaints for DeptHead role
 exports.getAssignedComplaints = async (req, res) => {
   try {
-   const departmentId = req.user.department;
+    const departmentId = req.user.department;
     if (!departmentId) {
-      return res.status(400).json({ message: 'Admin not associated with any department' });
+      return res.status(400).json({ message: 'DeptHead not associated with any department' });
     }
 
     const match = { department: departmentId };
@@ -224,7 +259,7 @@ exports.getAssignedComplaints = async (req, res) => {
   }
 };
 
-// Update complaint status For DeptAdmin role
+// Update complaint status for DeptHead role
 exports.updateComplaintStatus = async (req, res) => {
   try {
     const { id } = req.params;
@@ -232,7 +267,7 @@ exports.updateComplaintStatus = async (req, res) => {
 
     const allowedStatuses = ['In Progress', 'Resolved'];
     if (!allowedStatuses.includes(status)) {
-      return res.status(400).json({ message: 'DeptAdmin can only change status to "In Progress" or "Resolved"' });
+      return res.status(400).json({ message: 'DeptHead can only change status to "In Progress" or "Resolved"' });
     }
 
     const complaint = await Complaint.findById(id);
@@ -240,8 +275,8 @@ exports.updateComplaintStatus = async (req, res) => {
       return res.status(404).json({ message: 'Complaint not found' });
     }
 
-    const adminDepartmentId = req.user.department;
-    if (!adminDepartmentId || complaint.department?.toString() !== adminDepartmentId.toString()) {
+    const deptHeadDepartmentId = req.user.department;
+    if (!deptHeadDepartmentId || complaint.department?.toString() !== deptHeadDepartmentId.toString()) {
       return res.status(403).json({ message: 'You are not authorized to update this complaint' });
     }
 
@@ -300,12 +335,12 @@ exports.updateComplaintStatus = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-// Get all complaints in the organization for OrgAdmin role
+
+// Get all complaints in the organization for OrgHead role (not OrgAdmin)
 exports.getComplaintsByOrganization = async (req, res) => {
   try {
-    
-    if (req.user.role !== 'OrgAdmin') {
-      return res.status(403).json({ message: 'Access denied. Only OrgAdmin allowed.' });
+    if (req.user.role !== 'OrgHead') {
+      return res.status(403).json({ message: 'Access denied. Only OrgHead allowed.' });
     }
 
     const organizationId = req.user.organization;
@@ -325,14 +360,24 @@ exports.getComplaintsByOrganization = async (req, res) => {
   }
 };
 
-// Admin override endpoint (OrgAdmin only)
+// Admin override endpoint (OrgHead only)
 exports.adminOverride = async (req, res) => {
   try {
     const { id } = req.params;
-    const { department, priority, status, category, isSpam, duplicateOf, comment } = req.body;
+    const { department, priority, status, isSpam, duplicateOf, comment } = req.body;
+
+    // Check if user is OrgHead
+    if (req.user.role !== 'OrgHead') {
+      return res.status(403).json({ message: 'Access denied. Only OrgHead can perform overrides.' });
+    }
 
     const complaint = await Complaint.findById(id);
     if (!complaint) return res.status(404).json({ message: 'Complaint not found' });
+
+    // Verify complaint belongs to OrgHead's organization
+    if (complaint.organization.toString() !== req.user.organization.toString()) {
+      return res.status(403).json({ message: 'You can only override complaints from your organization' });
+    }
 
     // Store old values for notification decisions
     const oldDepartment = complaint.department?.toString();
@@ -356,11 +401,6 @@ exports.adminOverride = async (req, res) => {
       complaint.status = status;
       if (status === 'Resolved') complaint.resolvedAt = new Date();
       overrides.status = true;
-    }
-    if (category && category !== complaint.category) {
-      changes.push(`category from ${complaint.category} to ${category}`);
-      complaint.category = category;
-      overrides.category = true;
     }
     if (isSpam !== undefined && isSpam !== complaint.isSpam) {
       changes.push(`isSpam from ${complaint.isSpam} to ${isSpam}`);
@@ -387,22 +427,20 @@ exports.adminOverride = async (req, res) => {
       });
       await complaint.save();
 
-      // notifiy the new deptAdmin that complain has been assigned
+      // Notify the new DeptHead that complaint has been assigned
       if (department && department !== oldDepartment) {
-        const newDeptAdmin = await User.findOne({ department: department, role: 'DeptAdmin', isActive: true });
-        if (newDeptAdmin) {
+        const newDeptHead = await User.findOne({ department: department, role: 'DeptHead', isActive: true });
+        if (newDeptHead) {
           await Notification.create({
-            user: newDeptAdmin._id,
+            user: newDeptHead._id,
             type: 'COMPLAINT_ASSIGNED',
             title: 'Complaint assigned to your department',
-            message: `Complaint "${complaint.title}" has been assigned to your department by OrgAdmin.`,
+            message: `Complaint "${complaint.title}" has been assigned to your department by OrgHead.`,
             data: { complaintId: complaint._id, departmentId: department },
             read: false,
           });
         }
       }
-
-     
     }
 
     res.json({ success: true, complaint });

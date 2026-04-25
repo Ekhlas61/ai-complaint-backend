@@ -37,11 +37,11 @@ async function findDuplicateComplaint(complaint, similarityThreshold = 0.55) {
 }
 
 // Notification helpers 
-async function notifyDepartmentAdmins(departmentId, complaintId, complaintTitle) {
-  const admins = await User.find({ department: departmentId, role: 'DeptAdmin' }).select('_id');
-  if (!admins.length) return;
-  const notifications = admins.map(admin => ({
-    user: admin._id,
+async function notifyDepartmentHeads(departmentId, complaintId, complaintTitle) {
+  const deptHeads = await User.find({ department: departmentId, role: 'DeptHead' }).select('_id');
+  if (!deptHeads.length) return;
+  const notifications = deptHeads.map(head => ({
+    user: head._id,
     type: 'COMPLAINT_ASSIGNED',
     title: 'New complaint assigned',
     message: `Complaint "${complaintTitle}" has been assigned to your department.`,
@@ -51,11 +51,11 @@ async function notifyDepartmentAdmins(departmentId, complaintId, complaintTitle)
   await Notification.insertMany(notifications);
 }
 
-async function notifyOrgAdmins(organizationId, complaintId, complaintTitle, reason) {
-  const orgAdmins = await User.find({ organization: organizationId, role: 'OrgAdmin' }).select('_id');
-  if (!orgAdmins.length) return;
-  const notifications = orgAdmins.map(admin => ({
-    user: admin._id,
+async function notifyOrgHeads(organizationId, complaintId, complaintTitle, reason) {
+  const orgHeads = await User.find({ organization: organizationId, role: 'OrgHead' }).select('_id');
+  if (!orgHeads.length) return;
+  const notifications = orgHeads.map(head => ({
+    user: head._id,
     type: 'REVIEW_NEEDED',
     title: 'Complaint requires review',
     message: `Complaint "${complaintTitle}" requires attention: ${reason}`,
@@ -123,7 +123,7 @@ exports.moderateComplaint = async (req, res) => {
 
     await complaint.save();
 
-    // Notify OrgAdmins for specific conditions
+    // Notify OrgHeads for specific conditions
     let notifyOrgReason = null;
     if (aiResult.isSpam && aiResult.aiConfidence >= 0.7) {
       notifyOrgReason = 'Marked as spam by AI (high confidence).';
@@ -135,7 +135,7 @@ exports.moderateComplaint = async (req, res) => {
       notifyOrgReason = 'AI high confidence but no department assigned. Manual routing needed.';
     }
     if (notifyOrgReason) {
-      await notifyOrgAdmins(complaint.organization._id, complaint._id, complaint.title, notifyOrgReason);
+      await notifyOrgHeads(complaint.organization._id, complaint._id, complaint.title, notifyOrgReason);
     }
 
     
@@ -143,7 +143,7 @@ exports.moderateComplaint = async (req, res) => {
                               (complaint.status === 'Submitted') && 
                               !aiResult.isSpam;
     if (shouldNotifyDept) {
-      await notifyDepartmentAdmins(matchedDept._id, complaint._id, complaint.title);
+      await notifyDepartmentHeads(matchedDept._id, complaint._id, complaint.title);
     }
 
     res.json({

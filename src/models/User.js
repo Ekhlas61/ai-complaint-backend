@@ -29,7 +29,7 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ['Citizen', 'DeptAdmin', 'OrgAdmin', 'SysAdmin'],
+      enum: ['Citizen', 'DeptHead', 'OrgAdmin', 'OrgHead', 'SysAdmin'],
       required: true,
       default: 'Citizen',
     },
@@ -84,15 +84,20 @@ const userSchema = new mongoose.Schema(
 
 
 // Indexes
-userSchema.index({ role: 1 });
-userSchema.index({ organization: 1 });
 userSchema.index({ organization: 1, role: 1 }, { 
   unique: true, 
+  name: 'unique_active_orgadmin_per_org',
   partialFilterExpression: { role: 'OrgAdmin', organization: { $exists: true, $ne: null } }
 });
 userSchema.index({ department: 1, role: 1 }, { 
   unique: true, 
-  partialFilterExpression: { role: 'DeptAdmin', department: { $exists: true, $ne: null } }
+  name: 'unique_active_depthead_per_dept',
+  partialFilterExpression: { role: 'DeptHead', department: { $exists: true, $ne: null } }
+});
+userSchema.index({ organization: 1, role: 1 }, { 
+  unique: true, 
+  name: 'unique_active_orghead_per_org',
+  partialFilterExpression: { role: 'OrgHead', organization: { $exists: true, $ne: null } }
 });
 
 module.exports = mongoose.model('User', userSchema);

@@ -1,4 +1,3 @@
-
 const authorizeRoles = (...allowedRoles) => {
   return (req, res, next) => {
     if (!req.user) {
@@ -22,10 +21,10 @@ const isCitizen = (req, res, next) => {
   next();
 };
 
-const isDeptAdmin = (req, res, next) => {
+const isDeptHead = (req, res, next) => {
   if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
-  if (req.user.role !== 'DeptAdmin') {
-    return res.status(403).json({ message: 'Access denied. DeptAdmin role required.' });
+  if (req.user.role !== 'DeptHead') {
+    return res.status(403).json({ message: 'Access denied. DeptHead role required.' });
   }
   next();
 };
@@ -34,6 +33,14 @@ const isOrgAdmin = (req, res, next) => {
   if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
   if (req.user.role !== 'OrgAdmin') {
     return res.status(403).json({ message: 'Access denied. OrgAdmin role required.' });
+  }
+  next();
+};
+
+const isOrgHead = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+  if (req.user.role !== 'OrgHead') {
+    return res.status(403).json({ message: 'Access denied. OrgHead role required.' });
   }
   next();
 };
@@ -49,7 +56,8 @@ const isSysAdmin = (req, res, next) => {
 module.exports = {
   authorizeRoles,
   isCitizen,
-  isDeptAdmin,
+  isDeptHead,
   isOrgAdmin,
+  isOrgHead,
   isSysAdmin,
 };
