@@ -25,10 +25,21 @@ const aiRoutes = require('./src/routes/aiRoutes');
 
 const app = express();
 
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://localhost:5000',     
+  'https://ai-complaint-backend-7xc5.onrender.com',
+  'http://localhost:50510', // Flutter development
+  'http://localhost:3000',  // Common React development
+  'http://localhost:8080',  // Common Vue/Angular development     
+  'https://complaint-resolution-system.vercel.app'      
+].filter(Boolean);
+
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL ||  'https://complaint-resolution-system.vercel.app',
+    origin: allowedOrigins,
     credentials: true,
   },
 });
@@ -76,15 +87,6 @@ io.on('connection', (socket) => {
 app.set('io', io);
 
 // CORS configuration – allow local Swagger UI and frontend during development
-const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:5173',
-  'http://localhost:5000',     
-  'https://ai-complaint-backend-7xc5.onrender.com',
-  'http://localhost:50510', // Flutter development
-  'http://localhost:3000',  // Common React development
-  'http://localhost:8080',  // Common Vue/Angular development     
-  'https://complaint-resolution-system.vercel.app'      
-];
 
 app.use(cors({
   origin: function (origin, callback) {
