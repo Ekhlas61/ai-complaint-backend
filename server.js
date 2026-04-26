@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const connectDB = require('./src/config/db');
+const { initCasbin } = require('./src/config/casbin');
 const swaggerUi = require("swagger-ui-express");
 const YAML = require("yamljs");
 const cors = require('cors');
@@ -148,12 +149,22 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 
-// Start server only after DB connection succeeds
+// Start server only after DB connection and Casbin initialization succeed
 connectDB()
-  .then(() => {
-    server.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
-    });
+  .then(async () => {
+    try {
+      // Initialize Casbin after DB connection
+      await initCasbin();
+      
+      // Start server after Casbin is ready
+      server.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
+        console.log('🔐 Casbin authorization system initialized');
+      });
+    } catch (casbinError) {
+      console.error('Failed to initialize Casbin, exiting...', casbinError);
+      process.exit(1);
+    }
   })
   .catch((err) => {
     console.error('Failed to connect to database, exiting...', err);
