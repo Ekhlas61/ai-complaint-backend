@@ -6,6 +6,28 @@ const User = require('../models/User');
 const { moderateComplaint } = require('../controllers/aiController');
 const Organization = require('../models/Organization');
 
+// Helper function to generate full URL for attachment
+const getAttachmentUrl = (path) => {
+  if (!path) return null;
+  
+  // If path is already a full URL, return as is
+  if (path.startsWith('http')) {
+    return path;
+  }
+  
+  // If it's an S3 key or relative path, generate full URL
+  const S3_BUCKET = process.env.AWS_S3_BUCKET;
+  const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+  
+  // If path already includes bucket name, return as is
+  if (path.includes(S3_BUCKET)) {
+    return path;
+  }
+  
+  // Generate full S3 URL
+  return `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${path}`;
+};
+
 async function notifyCommentParticipants(complaint, commentAuthor, commentText) {
   const participants = [];
 
@@ -97,7 +119,13 @@ exports.createComplaint = async (req, res) => {
         title: complaint.title,
         description: complaint.description,
         status: complaint.status,
-        attachments: complaint.attachments,   
+        attachments: complaint.attachments && complaint.attachments.length > 0 
+          ? complaint.attachments.map(att => ({
+              url: getAttachmentUrl(att.path),
+              filename: att.filename || 'image',
+              uploadedAt: att.uploadedAt
+            }))
+          : [],   
         createdAt: complaint.createdAt,
       }
     });
@@ -149,7 +177,7 @@ exports.getMyComplaints = async (req, res) => {
         } : null,
         attachments: complaint.attachments && complaint.attachments.length > 0 
           ? complaint.attachments.map(att => ({
-              url: att.path,
+              url: getAttachmentUrl(att.path),
               filename: att.filename || 'image',
               uploadedAt: att.uploadedAt
             }))
@@ -252,7 +280,19 @@ exports.getAssignedComplaints = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50);
 
-    res.json(complaints);
+    // Format attachments with proper URLs
+    const formattedComplaints = complaints.map(complaint => ({
+      ...complaint.toObject(),
+      attachments: complaint.attachments && complaint.attachments.length > 0 
+        ? complaint.attachments.map(att => ({
+            url: getAttachmentUrl(att.path),
+            filename: att.filename || 'image',
+            uploadedAt: att.uploadedAt
+          }))
+        : []
+    }));
+
+    res.json(formattedComplaints);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -332,7 +372,7 @@ exports.updateComplaintStatus = async (req, res) => {
     res.json({ message: 'Complaint status updated successfully' });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    res.status(500).json({ message: err.message });
   }
 };
 
@@ -353,7 +393,19 @@ exports.getComplaintsByOrganization = async (req, res) => {
       .populate('department', 'name code')
       .sort({ createdAt: -1 });
 
-    res.json(complaints);
+    // Format attachments with proper URLs
+    const formattedComplaints = complaints.map(complaint => ({
+      ...complaint.toObject(),
+      attachments: complaint.attachments && complaint.attachments.length > 0 
+        ? complaint.attachments.map(att => ({
+            url: getAttachmentUrl(att.path),
+            filename: att.filename || 'image',
+            uploadedAt: att.uploadedAt
+          }))
+        : []
+    }));
+
+    res.json(formattedComplaints);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: err.message });
