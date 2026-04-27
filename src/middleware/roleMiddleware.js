@@ -29,6 +29,14 @@ const isDeptHead = (req, res, next) => {
   next();
 };
 
+const isDeptAdmin = (req, res, next) => {
+  if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
+  if (req.user.role !== 'DeptAdmin') {
+    return res.status(403).json({ message: 'Access denied. DeptAdmin role required.' });
+  }
+  next();
+};
+
 const isOrgAdmin = (req, res, next) => {
   if (!req.user) return res.status(401).json({ message: 'Not authenticated' });
   if (req.user.role !== 'OrgAdmin') {
@@ -57,6 +65,7 @@ module.exports = {
   authorizeRoles,
   isCitizen,
   isDeptHead,
+  isDeptAdmin,
   isOrgAdmin,
   isOrgHead,
   isSysAdmin,

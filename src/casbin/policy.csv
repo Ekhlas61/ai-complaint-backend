@@ -1,0 +1,43 @@
+# Policies for complaint operations with RBAC and organization support
+# Format: p, role, resource, action, organization
+
+# Citizen permissions - can create complaints in any organization
+p, Citizen, complaint, create, *
+p, Citizen, complaint, read_own, *
+
+# DeptHead permissions - can manage complaints in their department/organization
+p, DeptHead, complaint, read, org
+p, DeptHead, complaint, update_status, org
+p, DeptHead, complaint, assign, org
+p, DeptHead, complaint, comment, org
+
+# DeptAdmin permissions - similar to DeptHead but more limited
+p, DeptAdmin, complaint, read, org
+p, DeptAdmin, complaint, update_status, org
+p, DeptAdmin, complaint, comment, org
+
+# OrgAdmin permissions - can manage all complaints in their organization
+p, OrgAdmin, complaint, read, org
+p, OrgAdmin, complaint, update_status, org
+p, OrgAdmin, complaint, assign, org
+p, OrgAdmin, complaint, comment, org
+p, OrgAdmin, complaint, override, org
+
+# OrgHead permissions - can manage all complaints in their organization
+p, OrgHead, complaint, read, org
+p, OrgHead, complaint, update_status, org
+p, OrgHead, complaint, assign, org
+p, OrgHead, complaint, comment, org
+p, OrgHead, complaint, override, org
+
+# SysAdmin permissions - can manage all complaints across all organizations
+p, SysAdmin, complaint, create, *
+p, SysAdmin, complaint, read, *
+p, SysAdmin, complaint, update_status, *
+p, SysAdmin, complaint, assign, *
+p, SysAdmin, complaint, comment, *
+p, SysAdmin, complaint, override, *
+p, SysAdmin, complaint, delete, *
+
+# Role hierarchy (if needed for future use)
+# g, role1, role2 means role1 inherits role2's permissions

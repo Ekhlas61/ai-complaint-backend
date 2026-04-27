@@ -55,12 +55,12 @@ const seedAll = async () => {
     // ========== CREATE ORGADMINS (one per organization) ==========
     const orgAdminsData = [
       {
-        email: 'orgadmin@eep.com.et',
+        email: 'admin@eep.com.et',
         fullName: 'EEP Organization Admin',
         organization: eepOrg._id,
       },
       {
-        email: 'orgadmin@aawsa.gov.et',
+        email: 'admin@aawsa.gov.et',
         fullName: 'AAWSA Organization Admin',
         organization: aawsaOrg._id,
       },
@@ -225,22 +225,22 @@ const seedAll = async () => {
       console.log(`Department seeded: ${dept.code} (${dept.name})`);
     }
 
-    // ========== CREATE DEPTHEADS (one per department) ==========
+    // ========== CREATE DEPTHEADS AND DEPTADMINS (one per department) ==========
     const deptHeadsData = [
       // AAWSA DeptHeads
-      { fullName: 'Ayele Water Supply', email: 'water.supply@aawsa.gov.et', departmentCode: 'WATER_SUPPLY', org: aawsaOrg },
-      { fullName: 'Bekele Water Quality', email: 'water.quality@aawsa.gov.et', departmentCode: 'WATER_QUALITY', org: aawsaOrg },
-      { fullName: 'Chala Pipe Maintenance', email: 'pipe.maintenance@aawsa.gov.et', departmentCode: 'PIPE_MAINTENANCE', org: aawsaOrg },
-      { fullName: 'Desta Sewerage', email: 'sewerage@aawsa.gov.et', departmentCode: 'SEWERAGE', org: aawsaOrg },
-      { fullName: 'Eshetu Meter Service', email: 'meter.service.aawsa@aawsa.gov.et', departmentCode: 'METER_SERVICE_AAWSA', org: aawsaOrg },
-      { fullName: 'Fikru Customer Service', email: 'customer.service.aawsa@aawsa.gov.et', departmentCode: 'CUSTOMER_SERVICE_AAWSA', org: aawsaOrg },
+      { fullName: 'AAWSA Water Supply Head', email: 'water.supply@aawsa.gov.et', departmentCode: 'WATER_SUPPLY', org: aawsaOrg, role: 'DeptHead' },
+      { fullName: 'AAWSA Water Quality Head', email: 'water.quality@aawsa.gov.et', departmentCode: 'WATER_QUALITY', org: aawsaOrg, role: 'DeptHead' },
+      { fullName: 'AAWSA Pipe Maintenance Head', email: 'pipe.maintenance@aawsa.gov.et', departmentCode: 'PIPE_MAINTENANCE', org: aawsaOrg, role: 'DeptHead' },
+      { fullName: 'AAWSA Sewerage Admin', email: 'sewerage@aawsa.gov.et', departmentCode: 'SEWERAGE', org: aawsaOrg, role: 'DeptAdmin' },
+      { fullName: 'AAWSA Meter Service Admin', email: 'meter.service.aawsa@aawsa.gov.et', departmentCode: 'METER_SERVICE_AAWSA', org: aawsaOrg, role: 'DeptAdmin' },
+      { fullName: 'AAWSA Customer Service Admin', email: 'customer.service.aawsa@aawsa.gov.et', departmentCode: 'CUSTOMER_SERVICE_AAWSA', org: aawsaOrg, role: 'DeptAdmin' },
       // EEP DeptHeads
-      { fullName: 'Girma Power Outage', email: 'power.outage@eep.com.et', departmentCode: 'POWER_OUTAGE', org: eepOrg },
-      { fullName: 'Hana Safety Emergency', email: 'safety.emergency@eep.com.et', departmentCode: 'SAFETY_EMERGENCY', org: eepOrg },
-      { fullName: 'Ibrahim Transformer', email: 'transformer.issue@eep.com.et', departmentCode: 'TRANSFORMER_ISSUE', org: eepOrg },
-      { fullName: 'Jemal Line Maintenance', email: 'line.maintenance@eep.com.et', departmentCode: 'LINE_MAINTENANCE', org: eepOrg },
-      { fullName: 'Kebede Meter Service', email: 'meter.service.eep@eep.com.et', departmentCode: 'METER_SERVICE', org: eepOrg },
-      { fullName: 'Lemlem Customer Service', email: 'customer.service.eep@eep.com.et', departmentCode: 'CUSTOMER_SERVICE_EEP', org: eepOrg },
+      { fullName: 'EEP Power Outage Head', email: 'power.outage@eep.com.et', departmentCode: 'POWER_OUTAGE', org: eepOrg, role: 'DeptHead' },
+      { fullName: 'EEP Safety Emergency Head', email: 'safety.emergency@eep.com.et', departmentCode: 'SAFETY_EMERGENCY', org: eepOrg, role: 'DeptHead' },
+      { fullName: 'EEP Transformer Maintenance Head', email: 'transformer.issue@eep.com.et', departmentCode: 'TRANSFORMER_ISSUE', org: eepOrg, role: 'DeptHead' },
+      { fullName: 'EEP Line Maintenance Head', email: 'line.maintenance@eep.com.et', departmentCode: 'LINE_MAINTENANCE', org: eepOrg, role: 'DeptHead' },
+      { fullName: 'EEP Meter Service Head', email: 'meter.service.eep@eep.com.et', departmentCode: 'METER_SERVICE', org: eepOrg, role: 'DeptHead' },
+      { fullName: 'EEP Customer Service Head', email: 'customer.service.eep@eep.com.et', departmentCode: 'CUSTOMER_SERVICE_EEP', org: eepOrg, role: 'DeptHead' },
     ];
 
     for (const headData of deptHeadsData) {
@@ -252,11 +252,11 @@ const seedAll = async () => {
 
       const existingDeptHead = await User.findOne({
         department: department._id,
-        role: 'DeptHead',
+        role: headData.role,
         isActive: true,
       });
       if (existingDeptHead && existingDeptHead.email !== headData.email) {
-        console.warn(`DeptHead for department ${department.code} already exists: ${existingDeptHead.email}. Skipping ${headData.email}`);
+        console.warn(`${headData.role} for department ${department.code} already exists: ${existingDeptHead.email}. Skipping ${headData.email}`);
         continue;
       }
 
@@ -266,7 +266,7 @@ const seedAll = async () => {
           fullName: headData.fullName,
           email: headData.email,
           passwordHash,
-          role: 'DeptHead',
+          role: headData.role,
           loginMethod: 'manual',
           isActive: true,
           organization: headData.org._id,
@@ -274,10 +274,12 @@ const seedAll = async () => {
         },
         { upsert: true, new: true }
       );
-      console.log(`DeptHead seeded: ${user.email} (dept: ${department.code})`);
+      console.log(`${headData.role} seeded: ${user.email} (dept: ${department.code})`);
 
-      // Set department head to this DeptHead
-      await Department.findByIdAndUpdate(department._id, { head: user._id });
+      // Set department head to this user (only for DeptHead roles)
+      if (headData.role === 'DeptHead') {
+        await Department.findByIdAndUpdate(department._id, { head: user._id });
+      }
     }
 
     console.log('\n✅ Seeding completed successfully.');
@@ -285,7 +287,7 @@ const seedAll = async () => {
     console.log(`- SysAdmin: 1`);
     console.log(`- OrgAdmins: ${orgAdmins.length}`);
     console.log(`- OrgHeads: ${orgHeads.length}`);
-    console.log(`- DeptHeads: ${deptHeadsData.length}`);
+    console.log(`- DeptHeads/DeptAdmins: ${deptHeadsData.length}`);
     console.log(`- Total users: ${1 + orgAdmins.length + orgHeads.length + deptHeadsData.length}`);
     
     process.exit(0);
