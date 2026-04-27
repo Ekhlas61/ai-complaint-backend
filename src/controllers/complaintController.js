@@ -272,26 +272,78 @@ exports.getAssignedComplaints = async (req, res) => {
       return res.status(400).json({ message: 'DeptHead not associated with any department' });
     }
 
-    const match = { department: departmentId };
-
-    const complaints = await Complaint.find(match)
+    const complaints = await Complaint.find({ department: departmentId })
       .populate('submittedBy', 'fullName email')
       .populate('department', 'name code')
       .sort({ createdAt: -1 })
       .limit(50);
 
-    // Format attachments with proper URLs
-    const formattedComplaints = complaints.map(complaint => ({
-      ...complaint.toObject(),
-      attachments: complaint.attachments && complaint.attachments.length > 0 
-        ? complaint.attachments.map(att => ({
-            url: getAttachmentUrl(att.path),
-            filename: att.filename || 'image',
-            uploadedAt: att.uploadedAt
-          }))
-        : []
-    }));
-
+    // Format response for DeptHead
+    const formattedComplaints = complaints.map(complaint => {
+      // Check if location is valid (not [0,0])
+      const hasValidLocation = complaint.location && 
+                               complaint.location.coordinates && 
+                               complaint.location.coordinates.length === 2 &&
+                               complaint.location.coordinates[0] !== 0 && 
+                               complaint.location.coordinates[1] !== 0;
+      
+   
+      const lastActivity = complaint.history && complaint.history.length > 0 
+        ? complaint.history[complaint.history.length - 1]
+        : null;
+      
+      return {
+        id: complaint._id,
+        title: complaint.title,
+        description: complaint.description,
+        status: complaint.status,
+        priority: complaint.priority,  
+        createdAt: complaint.createdAt,
+        updatedAt: complaint.updatedAt,
+        resolvedAt: complaint.resolvedAt || null,
+        
+        // Citizen information
+        citizen: {
+          name: complaint.submittedBy?.fullName || 'Unknown',
+          email: complaint.submittedBy?.email || 'Unknown'
+        },
+        
+        // Department information
+        department: complaint.department ? {
+          id: complaint.department._id,
+          name: complaint.department.name,
+          code: complaint.department.code
+        } : null,
+        
+        // Location 
+        location: hasValidLocation ? {
+          latitude: complaint.location.coordinates[1],
+          longitude: complaint.location.coordinates[0],
+          name: complaint.location.locationName || null
+        } : null,
+        
+        // Attachments with proper URLs
+        attachments: complaint.attachments && complaint.attachments.length > 0 
+          ? complaint.attachments.map(att => ({
+              url: getAttachmentUrl(att.path),
+              filename: att.filename || 'image',
+              uploadedAt: att.uploadedAt
+            }))
+          : [],
+        
+        // Last activity summary 
+        lastActivity: lastActivity ? {
+          action: lastActivity.action,
+          timestamp: lastActivity.timestamp,
+          comment: lastActivity.comment || null,
+          by: lastActivity.by 
+        } : null,
+        
+        isSpam: complaint.isSpam,  
+        isDuplicate: !!complaint.duplicateOf
+      };
+    });
+    
     res.json(formattedComplaints);
   } catch (err) {
     console.error(err);
