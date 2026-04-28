@@ -1057,7 +1057,7 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: Department statistics
+          description: Department statistics retrieved successfully
 
   /analytics/org-head:
     get:
@@ -1087,4 +1087,14 @@ paths:
         - bearerAuth: []
       responses:
         '200':
-          description: Personal statistics
+          description: Personal statistics retrieved successfully
+
+  /analytics/org-admin:
+    get:
+      summary: OrgAdmin stats
+      tags: [Analytics]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Organization admin analytics retrieved successfully

@@ -7,38 +7,25 @@ const {
   getOrgHeadStats,
   getSysAdminStats,
   getCitizenStats,
+  getOrgAdminStats,
 } = require('../controllers/analyticsController');
 
-// DeptHead routes
-router.get(
-  '/dept-head',
-  protect,
-  authorizeRoles('DeptHead'),
-  getDeptHeadStats
-);
+// Citizen route (no SysAdmin auth required)
+router.get('/citizen', protect, authorizeRoles('Citizen'), getCitizenStats);
 
-// OrgHead routes
-router.get(
-  '/org-head',
-  protect,
-  authorizeRoles('OrgHead'),
-  getOrgHeadStats
-);
+// DeptHead route
+router.get('/dept-head', protect, authorizeRoles('DeptHead'), getDeptHeadStats);
 
-// SysAdmin routes
-router.get(
-  '/sys-admin',
-  protect,
-  authorizeRoles('SysAdmin'),
-  getSysAdminStats
-);
+// OrgHead route
+router.get('/org-head', protect, authorizeRoles('OrgHead'), getOrgHeadStats);
 
-// Citizen routes
-router.get(
-  '/citizen',
-  protect,
-  authorizeRoles('Citizen'),
-  getCitizenStats
-);
+// OrgAdmin route
+router.get('/org-admin', protect, authorizeRoles('OrgAdmin'), getOrgAdminStats);
+
+// SysAdmin routes 
+router.use(protect);
+router.use(authorizeRoles('SysAdmin'));
+
+router.get('/sys-admin', getSysAdminStats);
 
 module.exports = router;
