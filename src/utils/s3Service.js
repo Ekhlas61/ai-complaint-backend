@@ -32,8 +32,11 @@ const uploadFile = async (file, folder = 'uploads') => {
 
     const result = await upload.done();
     
+    // Return presigned URL instead of public URL for private buckets
+    const signedUrl = await getSignedFileUrl(fileName, 3600); // 1 hour expiry
+    
     return {
-      url: `https://${S3_BUCKET}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${fileName}`,
+      url: signedUrl,
       key: fileName,
       location: result.Location,
       etag: result.ETag,

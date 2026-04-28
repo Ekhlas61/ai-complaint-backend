@@ -6,26 +6,48 @@ const User = require('../models/User');
 const { moderateComplaint } = require('../controllers/aiController');
 const Organization = require('../models/Organization');
 
-// Helper function to generate full URL for attachment
-const getAttachmentUrl = (path) => {
+// Helper function to generate URL for attachment
+const getAttachmentUrl = async (path) => {
   if (!path) return null;
   
-  // If path is already a full URL, return as is
+  // If path is already a full URL (presigned URL), return as is
   if (path.startsWith('http')) {
     return path;
   }
   
-  // If it's an S3 key or relative path, generate full URL
-  const S3_BUCKET = process.env.AWS_S3_BUCKET;
-  const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
-  
-  // If path already includes bucket name, return as is
-  if (path.includes(S3_BUCKET)) {
-    return path;
+  // If it's an S3 key, generate presigned URL
+  try {
+    const { getSignedFileUrl } = require('../utils/s3Service');
+    const signedUrl = await getSignedFileUrl(path, 3600); // 1 hour expiry
+    return signedUrl;
+  } catch (error) {
+    console.error('Error generating presigned URL:', error);
+    
+    // Fallback to public URL generation
+    const S3_BUCKET = process.env.AWS_S3_BUCKET;
+    const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+    
+    // If path already includes bucket name, return as is
+    if (path.includes(S3_BUCKET)) {
+      return path;
+    }
+    
+    // Generate full S3 URL
+    return `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${path}`;
+  }
+};
+
+// Helper function to format attachments with proper URLs
+const formatAttachments = async (attachments) => {
+  if (!attachments || attachments.length === 0) {
+    return [];
   }
   
-  // Generate full S3 URL
-  return `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${path}`;
+  return await Promise.all(attachments.map(async (att) => ({
+    url: await getAttachmentUrl(att.path),
+    filename: att.filename || 'image',
+    uploadedAt: att.uploadedAt
+  })));
 };
 
 async function notifyCommentParticipants(complaint, commentAuthor, commentText) {
