@@ -1013,6 +1013,19 @@ paths:
         '200':
           description: AI moderation completed
 
+  /ai/provider-stats:
+    get:
+      summary: Get AI provider statistics
+      tags: [AI]
+      security:
+        - bearerAuth: []
+      description: Returns success/failure rates for Gemini and Groq AI providers. SysAdmin only.
+      responses:
+        '200':
+          description: AI provider statistics retrieved successfully
+        '403':
+          description: Access denied. SysAdmin privileges required.
+
   # ========== NOTIFICATIONS ==========
   /notifications:
     get:

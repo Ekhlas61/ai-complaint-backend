@@ -1,4 +1,5 @@
 const { GoogleGenAI } = require('@google/genai');
+const Groq = require('groq-sdk');
 const { z } = require('zod');
 require('dotenv').config();
 
@@ -13,105 +14,114 @@ const moderationSchema = z.object({
   reasoning: z.string(),
 });
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+// Initialize AI clients
+const geminiAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-// ========== CACHE IMPLEMENTATION ==========
-class AICache {
-  constructor(ttl = 3600000) { // Default TTL: 1 hour
-    this.cache = new Map();
-    this.ttl = ttl;
-  }
+let groqClient = null;
+if (process.env.GROQ_API_KEY) {
+  groqClient = new Groq({ apiKey: process.env.GROQ_API_KEY });
+  console.log('[AI] Groq client initialized as fallback');
+}
 
-  generateKey(title, description, organizationId) {
-    // Create a normalized key for caching
-    const normalizedTitle = title.toLowerCase().trim();
-    const normalizedDesc = description.toLowerCase().trim();
-    return `${normalizedTitle}|${normalizedDesc}|${organizationId}`;
-  }
+// Provider stats for monitoring
+const providerStats = {
+  gemini: { success: 0, failures: 0, lastError: null },
+  groq: { success: 0, failures: 0, lastError: null }
+};
 
-  get(key) {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
+// ========== GEMINI IMPLEMENTATION ==========
+async function callGemini(prompt) {
+  try {
+    console.log('[Gemini] Sending request...');
     
-    // Check if cache entry has expired
-    if (Date.now() - entry.timestamp > this.ttl) {
-      this.cache.delete(key);
-      return null;
-    }
-    
-    return entry.result;
-  }
-
-  set(key, result) {
-    this.cache.set(key, {
-      result: result,
-      timestamp: Date.now()
+    const response = await geminiAI.models.generateContent({
+      model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite',
+      contents: prompt,
+      config: {
+        temperature: 0.1,
+        maxOutputTokens: 300,
+      },
     });
-  }
-
-  clear() {
-    this.cache.clear();
-    console.log('[Cache] Cleared all cached entries');
-  }
-
-  getStats() {
-    return {
-      size: this.cache.size,
-      ttl: this.ttl / 1000 + ' seconds'
-    };
+    
+    providerStats.gemini.success++;
+    console.log('[Gemini] Success');
+    return { success: true, text: response.text, provider: 'gemini' };
+    
+  } catch (error) {
+    providerStats.gemini.failures++;
+    providerStats.gemini.lastError = error.message;
+    
+    const isQuotaError = error.code === 429 || 
+                        error.message?.includes('quota') ||
+                        error.message?.includes('rate limit') ||
+                        error.message?.includes('exhausted');
+    
+    console.log(`[Gemini] Failed: ${error.message} (Quota error: ${isQuotaError})`);
+    return { success: false, error, isQuotaError, provider: 'gemini' };
   }
 }
 
-// Initialize cache
-const aiCache = new AICache(3600000); // 1 hour TTL
-
-// ========== RETRY LOGIC ==========
-async function callGeminiWithRetry(prompt, maxRetries = 3, initialDelay = 1000) {
-  let lastError = null;
+// ========== GROQ IMPLEMENTATION (FALLBACK) ==========
+async function callGroq(prompt) {
+  if (!groqClient) {
+    console.log('[Groq] Client not initialized (missing API key)');
+    return { success: false, error: new Error('Groq client not initialized'), provider: 'groq' };
+  }
   
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      console.log(`[Retry] Attempt ${attempt}/${maxRetries} for Gemini API`);
-      
-      const response = await ai.models.generateContent({
-        model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite',
-        contents: prompt,
-        config: {
-          temperature: 0.1,
-          maxOutputTokens: 300,
-        },
-      });
-      
-      console.log(`[Retry] Success on attempt ${attempt}`);
-      return response;
-      
-    } catch (error) {
-      lastError = error;
-      
-      // Check if it's a rate limit error (429)
-      const isRateLimit = error.code === 429 || 
-                         (error.message && error.message.includes('quota'));
-      
-      if (isRateLimit && attempt < maxRetries) {
-        // Calculate exponential backoff delay
-        const delayMs = initialDelay * Math.pow(2, attempt - 1);
-        console.log(`[Retry] Rate limited. Waiting ${delayMs}ms before retry ${attempt + 1}...`);
-        await new Promise(resolve => setTimeout(resolve, delayMs));
-        continue;
-      }
-      
-      // For non-rate-limit errors, don't retry
-      if (!isRateLimit) {
-        console.log(`[Retry] Non-retryable error:`, error.message);
-        throw error;
-      }
+  try {
+    console.log('[Groq] Sending request as fallback...');
+    
+    const response = await groqClient.chat.completions.create({
+      model: process.env.GROQ_MODEL || 'llama-3.1-8b-instant',
+      messages: [
+        { role: 'system', content: 'You are a complaint classifier for a utility company. Return ONLY valid JSON, no explanations.' },
+        { role: 'user', content: prompt }
+      ],
+      temperature: 0.1,
+      max_tokens: 300,
+    });
+    
+    providerStats.groq.success++;
+    console.log('[Groq] Success');
+    return { success: true, text: response.choices[0].message.content, provider: 'groq' };
+    
+  } catch (error) {
+    providerStats.groq.failures++;
+    providerStats.groq.lastError = error.message;
+    console.log(`[Groq] Failed: ${error.message}`);
+    return { success: false, error, provider: 'groq' };
+  }
+}
+
+// ========== MAIN ORCHESTRATOR ==========
+async function callAIWithFallback(prompt) {
+  // Try Gemini first
+  let result = await callGemini(prompt);
+  
+  // If Gemini succeeded, return
+  if (result.success) {
+    return result;
+  }
+  
+  // If Gemini failed due to quota, try Groq
+  if (result.isQuotaError && groqClient) {
+    console.log('[AI] Gemini quota exceeded, falling back to Groq...');
+    const groqResult = await callGroq(prompt);
+    
+    if (groqResult.success) {
+      console.log('[AI] Successfully using Groq as fallback');
+      return groqResult;
     }
   }
   
-  throw lastError;
+  // Both failed
+  console.log('[AI] All providers failed');
+  return { success: false, error: result.error };
 }
 
-// Helper: Calculate text similarity for duplicate detection
+// ========== HELPER FUNCTIONS ==========
+
+// Calculate text similarity for duplicate detection
 function calculateSimilarity(text1, text2) {
   const normalize = (text) => {
     return text
@@ -134,7 +144,7 @@ function calculateSimilarity(text1, text2) {
   return intersection.size / union.size;
 }
 
-// Helper: Find duplicate complaints in database
+// Find duplicate complaints
 async function findDuplicateComplaint(complaintTitle, complaintDescription, organizationId, complaintId, threshold = 0.6) {
   const Complaint = require('../models/Complaint');
   
@@ -165,11 +175,10 @@ async function findDuplicateComplaint(complaintTitle, complaintDescription, orga
   return { duplicateId: bestMatch, similarity: highestSimilarity };
 }
 
-// Helper: Improved spam detection (fewer false positives)
+// Quick spam detection (pre-AI filter)
 function quickSpamCheck(title, description) {
   const text = `${title} ${description}`.toLowerCase();
   
-  // First, check if it's a legitimate utility complaint
   const utilityKeywords = [
     'water', 'electric', 'power', 'meter', 'bill', 'pipe', 'tap', 
     'leak', 'outage', 'supply', 'quality', 'sewer', 'drain', 
@@ -184,7 +193,6 @@ function quickSpamCheck(title, description) {
     }
   }
   
-  // If it has utility context, only check for obvious spam with links
   if (hasUtilityContext) {
     const hasSuspiciousLink = /https?:\/\/|www\.|bit\.ly|t\.me/i.test(text);
     if (hasSuspiciousLink) {
@@ -193,7 +201,6 @@ function quickSpamCheck(title, description) {
     return { isSpam: false, reason: null, confidence: 0 };
   }
   
-  // For non-utility text, check spam indicators
   const spamPatterns = [
     { pattern: /https?:\/\/|www\.|bit\.ly|t\.me|telegram\.me/i, type: 'urls', confidence: 0.9 },
     { pattern: /win.*money|free.*money|earn.*money|cash.*prize/i, type: 'money_scam', confidence: 0.85 },
@@ -211,22 +218,22 @@ function quickSpamCheck(title, description) {
   return { isSpam: false, reason: null, confidence: 0 };
 }
 
-// Helper: Translate Amharic to English
+// Translate Amharic to English (using primary AI provider)
 async function translateToEnglish(text) {
   try {
-    const response = await ai.models.generateContent({
-      model: process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite',
-      contents: `You are a translator. Translate the following Amharic text to English. Output ONLY the English translation, no explanations, no quotes:\n\n${text}`,
-      config: { temperature: 0, maxOutputTokens: 500 },
-    });
-    return response.text.trim();
+    const result = await callAIWithFallback(`You are a translator. Translate the following Amharic text to English. Output ONLY the English translation, no explanations, no quotes:\n\n${text}`);
+    
+    if (result.success) {
+      return result.text.trim();
+    }
+    return text;
   } catch (err) {
-    console.warn('Translation failed:', err.message);
+    console.warn('[Translation] Failed:', err.message);
     return text;
   }
 }
 
-// Helper: Get departments as formatted string for AI prompt
+// Get departments as formatted string for AI prompt
 async function getDepartmentsForPrompt(organizationId) {
   const Department = require('../models/Department');
   const departments = await Department.find({ 
@@ -241,28 +248,16 @@ async function getDepartmentsForPrompt(organizationId) {
   ).join('\n');
 }
 
-// Main AI moderation function with cache and retry
+// ========== MAIN AI MODERATION FUNCTION ==========
 async function moderateComplaint(title, description, organizationName, organizationId, complaintId = null) {
   try {
     console.log(`[AI] Processing complaint: ${complaintId || 'new'}`);
     
-    // Step 1: Check cache first (skip for new complaints without ID)
-    const cacheKey = aiCache.generateKey(title, description, organizationId);
-    const cachedResult = aiCache.get(cacheKey);
-    
-    if (cachedResult && complaintId) {
-      console.log('[Cache] HIT - Using cached result for similar complaint');
-      console.log('[Cache] Cache stats:', aiCache.getStats());
-      return cachedResult;
-    }
-    
-    console.log('[Cache] MISS - Will analyze with AI');
-    
-    // Step 2: Quick spam detection
+    // Step 1: Quick spam detection (no AI needed)
     const quickSpam = quickSpamCheck(title, description);
     if (quickSpam.isSpam) {
-      console.log('[AI] Spam detected:', quickSpam.reason);
-      const result = {
+      console.log('[AI] Spam detected (pre-filter):', quickSpam.reason);
+      return {
         isSpam: true,
         priority: 'Low',
         department: null,
@@ -271,31 +266,27 @@ async function moderateComplaint(title, description, organizationName, organizat
         requiresManualReview: false,
         reasoning: `Marked as spam: ${quickSpam.reason}`,
       };
-      aiCache.set(cacheKey, result);
-      return result;
     }
     
-    // Step 3: Check for duplicates
+    // Step 2: Check for duplicates
     let duplicateCheck = { duplicateId: null, similarity: 0 };
     if (complaintId) {
       duplicateCheck = await findDuplicateComplaint(title, description, organizationId, complaintId, 0.6);
       if (duplicateCheck.duplicateId && duplicateCheck.similarity > 0.7) {
         console.log('[AI] Duplicate found:', duplicateCheck.similarity);
-        const result = {
+        return {
           isSpam: false,
           priority: 'Medium',
           department: null,
           duplicateOf: duplicateCheck.duplicateId,
           aiConfidence: 0.8,
           requiresManualReview: true,
-          reasoning: `Potential duplicate (${Math.round(duplicateCheck.similarity * 100)}% similar to existing complaint). Manual review recommended.`,
+          reasoning: `Potential duplicate (${Math.round(duplicateCheck.similarity * 100)}% similar). Manual review recommended.`,
         };
-        aiCache.set(cacheKey, result);
-        return result;
       }
     }
     
-    // Step 4: Translate Amharic if needed
+    // Step 3: Translate Amharic if needed
     const hasAmharic = /[\u1200-\u137F]/.test(title + description);
     let finalTitle = title;
     let finalDesc = description;
@@ -306,25 +297,23 @@ async function moderateComplaint(title, description, organizationName, organizat
       finalDesc = await translateToEnglish(description);
     }
     
-    // Step 5: Get departments for the organization
+    // Step 4: Get departments
     const departmentsList = await getDepartmentsForPrompt(organizationId);
     
     if (!departmentsList) {
       console.log('[AI] No departments found');
-      const result = {
+      return {
         isSpam: false,
         priority: 'Medium',
         department: null,
         duplicateOf: null,
         aiConfidence: 0.3,
         requiresManualReview: true,
-        reasoning: 'No departments configured for this organization. Manual review required.',
+        reasoning: 'No departments configured. Manual review required.',
       };
-      aiCache.set(cacheKey, result);
-      return result;
     }
     
-    // Step 6: AI analysis with retry logic
+    // Step 5: Build prompt
     const prompt = `You are a complaint classifier for a utility company. Analyze this complaint and return ONLY JSON.
 
 COMPLAINT:
@@ -336,22 +325,27 @@ DEPARTMENTS available:
 ${departmentsList}
 
 CLASSIFY using these rules:
-1. isSpam: true ONLY if contains promotional links, money offers, or phishing attempts. false for legitimate utility issues.
-2. priority: Critical=danger to life/property, High=major disruption (no water/power 12+ hours), Medium=standard issue, Low=minor
-3. department: Choose the BEST matching department code from the list. Use null if unclear or spam.
-4. aiConfidence: 0.9+ = very clear, 0.8-0.89 = clear, 0.7-0.79 = good, 0.6-0.69 = moderate, below 0.6 = unclear
-5. requiresManualReview: true if confidence < 0.7 OR department is null AND not spam
+1. isSpam: true ONLY if contains promotional links, money offers, or phishing attempts.
+2. priority: Critical=danger to life/property, High=major disruption (12+ hours), Medium=standard issue, Low=minor
+3. department: Choose the BEST matching department code from the list. Use null if unclear.
+4. aiConfidence: 0.9+=very clear, 0.8-0.89=clear, 0.7-0.79=good, 0.6-0.69=moderate, <0.6=unclear
+5. requiresManualReview: true if confidence < 0.7 OR department is null
 6. reasoning: One short sentence explaining your classification
 
 Return ONLY valid JSON. Example:
 {"isSpam": false, "priority": "High", "department": "WATER_SUPPLY", "aiConfidence": 0.85, "requiresManualReview": false, "reasoning": "Area-wide water outage requires urgent attention."}`;
 
-    const response = await callGeminiWithRetry(prompt, 3, 1000);
+    // Step 6: Call AI with fallback
+    const aiResponse = await callAIWithFallback(prompt);
     
-    let raw = response.text;
-    console.log('[AI] Raw response received, length:', raw.length);
+    if (!aiResponse.success) {
+      throw new Error('All AI providers failed');
+    }
     
-    // Extract JSON
+    console.log(`[AI] Response from ${aiResponse.provider}`);
+    
+    // Step 7: Parse response
+    let raw = aiResponse.text;
     let jsonStr = raw;
     const start = raw.indexOf('{');
     const end = raw.lastIndexOf('}');
@@ -362,7 +356,7 @@ Return ONLY valid JSON. Example:
     
     const result = JSON.parse(jsonStr);
     
-    // Build final result
+    // Step 8: Build final result
     const finalResult = {
       isSpam: result.isSpam || false,
       priority: result.priority || 'Medium',
@@ -370,10 +364,10 @@ Return ONLY valid JSON. Example:
       duplicateOf: duplicateCheck.duplicateId || null,
       aiConfidence: result.aiConfidence || 0.5,
       requiresManualReview: result.requiresManualReview || (result.aiConfidence || 0.5) < 0.7,
-      reasoning: result.reasoning || 'AI analysis completed.',
+      reasoning: `${result.reasoning || 'AI analysis completed.'} (Provider: ${aiResponse.provider})`,
     };
     
-    // Validate department exists
+    // Step 9: Validate department exists
     if (finalResult.department) {
       const Department = require('../models/Department');
       const deptExists = await Department.findOne({ 
@@ -386,13 +380,9 @@ Return ONLY valid JSON. Example:
         finalResult.department = null;
         finalResult.requiresManualReview = true;
         finalResult.aiConfidence = 0.5;
-        finalResult.reasoning = `Department "${finalResult.department}" not found. Manual review needed.`;
+        finalResult.reasoning = `Department "${finalResult.department}" not found. Manual review needed. (Provider: ${aiResponse.provider})`;
       }
     }
-    
-    // Cache the result
-    aiCache.set(cacheKey, finalResult);
-    console.log('[Cache] Result cached. Cache size:', aiCache.getStats().size);
     
     console.log('[AI] Final result:', finalResult);
     return moderationSchema.parse(finalResult);
@@ -413,21 +403,14 @@ Return ONLY valid JSON. Example:
   }
 }
 
-// Optional: Add admin endpoint to clear cache (for testing)
-async function clearCache() {
-  aiCache.clear();
-  console.log('[Cache] Cache cleared manually');
-}
-
-// Optional: Get cache stats
-function getCacheStats() {
-  return aiCache.getStats();
+// ========== MONITORING FUNCTIONS ==========
+function getProviderStats() {
+  return { ...providerStats };
 }
 
 module.exports = { 
   moderateComplaint,
   findDuplicateComplaint,
   quickSpamCheck,
-  clearCache,
-  getCacheStats
+  getProviderStats
 };

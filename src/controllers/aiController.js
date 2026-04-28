@@ -1,8 +1,9 @@
-const { moderateComplaint: aiServiceModerate } = require('../services/aiService');
+const { moderateComplaint: aiServiceModerate, getProviderStats } = require('../services/aiService');
 const Complaint = require('../models/Complaint');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 
+// ========== MODERATE ENDPOINT (For testing) ==========
 exports.moderateComplaint = async (req, res) => {
   try {
     const { complaintId } = req.body;
@@ -13,8 +14,6 @@ exports.moderateComplaint = async (req, res) => {
       return res.status(404).json({ message: 'Complaint not found' });
     }
 
-    console.log(`Starting AI moderation for complaint: ${complaintId}`);
-
     // Run AI analysis
     const aiResult = await aiServiceModerate(
       complaint.title,
@@ -23,8 +22,6 @@ exports.moderateComplaint = async (req, res) => {
       complaint.organization._id,
       complaint._id 
     );
-
-    console.log('AI Result:', aiResult);
 
     // Update complaint with AI results
     complaint.isSpam = aiResult.isSpam;
@@ -41,27 +38,22 @@ exports.moderateComplaint = async (req, res) => {
       });
       if (department) {
         complaint.department = department._id;
-        complaint.status = 'Submitted'; 
-        console.log(`Assigned to department: ${department.name}`);
+        complaint.status = 'Submitted';
       } else {
         complaint.status = 'Manual Review';
-        console.log('Department not found, sending to manual review');
       }
     } 
     // Handle spam
     else if (aiResult.isSpam && aiResult.aiConfidence >= 0.7) {
       complaint.status = 'Rejected';
-      console.log('Marked as spam and rejected');
     }
     // Handle duplicate
     else if (aiResult.duplicateOf && aiResult.aiConfidence >= 0.7) {
       complaint.status = 'Manual Review';
-      console.log('Potential duplicate, sending to manual review');
     }
     // Low confidence or unclear
     else {
       complaint.status = 'Manual Review';
-      console.log('Low confidence or unclear, sending to manual review');
     }
 
     // Add to history
@@ -91,7 +83,6 @@ exports.moderateComplaint = async (req, res) => {
           read: false,
         }));
         await Notification.insertMany(notifications);
-        console.log(`Notified ${orgHeads.length} OrgHeads for manual review`);
       }
     } 
     // Notify DeptHead if assigned
@@ -112,7 +103,6 @@ exports.moderateComplaint = async (req, res) => {
           read: false,
         }));
         await Notification.insertMany(notifications);
-        console.log(`Notified ${deptHeads.length} DeptHeads`);
       }
     }
 
@@ -133,6 +123,28 @@ exports.moderateComplaint = async (req, res) => {
 
   } catch (err) {
     console.error('Moderation error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ========== AI PROVIDER STATS (SysAdmin only) ==========
+exports.getAIProviderStats = async (req, res) => {
+  try {
+    // Only SysAdmin can view AI provider stats
+    if (req.user.role !== 'SysAdmin') {
+      return res.status(403).json({ message: 'Access denied. SysAdmin privileges required.' });
+    }
+    
+    const stats = getProviderStats();
+    
+    res.json({
+      success: true,
+      providers: stats,
+      status: 'operational',
+      timestamp: new Date().toISOString()
+    });
+  } catch (err) {
+    console.error('Provider stats error:', err);
     res.status(500).json({ message: err.message });
   }
 };
