@@ -141,13 +141,7 @@ exports.createComplaint = async (req, res) => {
         title: complaint.title,
         description: complaint.description,
         status: complaint.status,
-        attachments: complaint.attachments && complaint.attachments.length > 0 
-          ? complaint.attachments.map(att => ({
-              url: getAttachmentUrl(att.path),
-              filename: att.filename || 'image',
-              uploadedAt: att.uploadedAt
-            }))
-          : [],   
+        attachments: await formatAttachments(complaint.attachments),
         createdAt: complaint.createdAt,
       }
     });
@@ -293,8 +287,8 @@ exports.getAssignedComplaints = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50);
 
-    // Format response for DeptHead
-    const formattedComplaints = complaints.map(complaint => {
+    // Format response for DeptHead with async attachment URLs
+    const formattedComplaints = await Promise.all(complaints.map(async (complaint) => {
       // Check if location is valid (not [0,0])
       const hasValidLocation = complaint.location && 
                                complaint.location.coordinates && 
@@ -338,13 +332,7 @@ exports.getAssignedComplaints = async (req, res) => {
         } : null,
         
         // Attachments with proper URLs
-        attachments: complaint.attachments && complaint.attachments.length > 0 
-          ? complaint.attachments.map(att => ({
-              url: getAttachmentUrl(att.path),
-              filename: att.filename || 'image',
-              uploadedAt: att.uploadedAt
-            }))
-          : [],
+        attachments: await formatAttachments(complaint.attachments),
         
         // Last activity summary 
         lastActivity: lastActivity ? {
@@ -461,16 +449,10 @@ exports.getComplaintsByOrganization = async (req, res) => {
       .sort({ createdAt: -1 });
 
     // Format attachments with proper URLs
-    const formattedComplaints = complaints.map(complaint => ({
+    const formattedComplaints = await Promise.all(complaints.map(async (complaint) => ({
       ...complaint.toObject(),
-      attachments: complaint.attachments && complaint.attachments.length > 0 
-        ? complaint.attachments.map(att => ({
-            url: getAttachmentUrl(att.path),
-            filename: att.filename || 'image',
-            uploadedAt: att.uploadedAt
-          }))
-        : []
-    }));
+      attachments: await formatAttachments(complaint.attachments)
+    })));
 
     res.json(formattedComplaints);
   } catch (err) {
