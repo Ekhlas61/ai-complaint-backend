@@ -168,15 +168,14 @@ async function moderateComplaintAsync(complaintId) {
 }
 
 // Get my complaints by Citizen role
-// Get my complaints by Citizen role
 exports.getMyComplaints = async (req, res) => {
   try {
     const complaints = await Complaint.find({ submittedBy: req.user._id })
       .populate('organization', 'name')
       .sort({ createdAt: -1 });
     
-    // Format the response for citizens
-    const formattedComplaints = complaints.map(complaint => {
+    // Format the response for citizens with async attachment URLs
+    const formattedComplaints = await Promise.all(complaints.map(async (complaint) => {
       // Check if location has valid coordinates (not [0,0])
       const hasValidLocation = complaint.location && 
                                complaint.location.coordinates && 
@@ -197,15 +196,9 @@ exports.getMyComplaints = async (req, res) => {
           longitude: complaint.location.coordinates[0],
           locationName: complaint.location.locationName || null
         } : null,
-        attachments: complaint.attachments && complaint.attachments.length > 0 
-          ? complaint.attachments.map(att => ({
-              url: getAttachmentUrl(att.path),
-              filename: att.filename || 'image',
-              uploadedAt: att.uploadedAt
-            }))
-          : []
+        attachments: await formatAttachments(complaint.attachments)
       };
-    });
+    }));
     
     res.json(formattedComplaints);
   } catch (err) {
