@@ -32,11 +32,9 @@ const uploadFile = async (file, folder = 'uploads') => {
 
     const result = await upload.done();
     
-    // Return presigned URL instead of public URL for private buckets
-    const signedUrl = await getSignedFileUrl(fileName, 3600); // 1 hour expiry
-    
+    // Return S3 key for storage (presigned URLs will be generated dynamically)
     return {
-      url: signedUrl,
+      url: fileName, // Store the S3 key, not a presigned URL
       key: fileName,
       location: result.Location,
       etag: result.ETag,
