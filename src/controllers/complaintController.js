@@ -443,6 +443,7 @@ exports.getComplaintsByOrganization = async (req, res) => {
     const complaints = await Complaint.find({ organization: organizationId })
       .populate('submittedBy', 'fullName email')
       .populate('department', 'name code')
+      .populate('assignedTo', 'fullName') 
       .sort({ createdAt: -1 });
 
     // Format attachments with proper URLs
