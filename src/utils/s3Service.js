@@ -32,8 +32,9 @@ const uploadFile = async (file, folder = 'uploads') => {
 
     const result = await upload.done();
     
+    // Return S3 key for storage (presigned URLs will be generated dynamically)
     return {
-      url: `https://${S3_BUCKET}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${fileName}`,
+      url: fileName, // Store the S3 key, not a presigned URL
       key: fileName,
       location: result.Location,
       etag: result.ETag,

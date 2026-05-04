@@ -6,26 +6,65 @@ const User = require('../models/User');
 const { moderateComplaint } = require('../controllers/aiController');
 const Organization = require('../models/Organization');
 
-// Helper function to generate full URL for attachment
-const getAttachmentUrl = (path) => {
+// Helper function to generate URL for attachment
+const getAttachmentUrl = async (path) => {
   if (!path) return null;
   
-  // If path is already a full URL, return as is
-  if (path.startsWith('http')) {
-    return path;
+  // If it's an S3 key (not starting with http), generate fresh presigned URL
+  if (!path.startsWith('http')) {
+    try {
+      const { getSignedFileUrl } = require('../utils/s3Service');
+      const signedUrl = await getSignedFileUrl(path, 3600); // 1 hour expiry
+      return signedUrl;
+    } catch (error) {
+      console.error('Error generating presigned URL:', error);
+      
+      // Fallback to public URL generation
+      const S3_BUCKET = process.env.AWS_S3_BUCKET;
+      const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
+      
+      // If path already includes bucket name, return as is
+      if (path.includes(S3_BUCKET)) {
+        return path;
+      }
+      
+      // Generate full S3 URL
+      return `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${path}`;
+    }
   }
   
-  // If it's an S3 key or relative path, generate full URL
-  const S3_BUCKET = process.env.AWS_S3_BUCKET;
-  const AWS_REGION = process.env.AWS_REGION || 'us-east-1';
-  
-  // If path already includes bucket name, return as is
-  if (path.includes(S3_BUCKET)) {
-    return path;
+  // For existing URLs, check if it's an expired presigned URL by looking for AWS signature parameters
+  if (path.includes('X-Amz-Signature')) {
+    // Extract the S3 key from the presigned URL to generate a fresh one
+    try {
+      const urlObj = new URL(path);
+      const s3Key = urlObj.pathname.substring(1); // Remove leading slash
+      
+      if (s3Key) {
+        const { getSignedFileUrl } = require('../utils/s3Service');
+        const freshSignedUrl = await getSignedFileUrl(s3Key, 3600);
+        return freshSignedUrl;
+      }
+    } catch (error) {
+      console.error('Error refreshing presigned URL:', error);
+    }
   }
   
-  // Generate full S3 URL
-  return `https://${S3_BUCKET}.s3.${AWS_REGION}.amazonaws.com/${path}`;
+  // Return as-is for other cases
+  return path;
+};
+
+// Helper function to format attachments with proper URLs
+const formatAttachments = async (attachments) => {
+  if (!attachments || attachments.length === 0) {
+    return [];
+  }
+  
+  return await Promise.all(attachments.map(async (att) => ({
+    url: await getAttachmentUrl(att.path),
+    filename: att.filename || 'image',
+    uploadedAt: att.uploadedAt
+  })));
 };
 
 async function notifyCommentParticipants(complaint, commentAuthor, commentText) {
@@ -119,13 +158,7 @@ exports.createComplaint = async (req, res) => {
         title: complaint.title,
         description: complaint.description,
         status: complaint.status,
-        attachments: complaint.attachments && complaint.attachments.length > 0 
-          ? complaint.attachments.map(att => ({
-              url: getAttachmentUrl(att.path),
-              filename: att.filename || 'image',
-              uploadedAt: att.uploadedAt
-            }))
-          : [],   
+        attachments: await formatAttachments(complaint.attachments),
         createdAt: complaint.createdAt,
       }
     });
@@ -146,15 +179,14 @@ async function moderateComplaintAsync(complaintId) {
 }
 
 // Get my complaints by Citizen role
-// Get my complaints by Citizen role
 exports.getMyComplaints = async (req, res) => {
   try {
     const complaints = await Complaint.find({ submittedBy: req.user._id })
       .populate('organization', 'name')
       .sort({ createdAt: -1 });
     
-    // Format the response for citizens
-    const formattedComplaints = complaints.map(complaint => {
+    // Format the response for citizens with async attachment URLs
+    const formattedComplaints = await Promise.all(complaints.map(async (complaint) => {
       // Check if location has valid coordinates (not [0,0])
       const hasValidLocation = complaint.location && 
                                complaint.location.coordinates && 
@@ -175,15 +207,9 @@ exports.getMyComplaints = async (req, res) => {
           longitude: complaint.location.coordinates[0],
           locationName: complaint.location.locationName || null
         } : null,
-        attachments: complaint.attachments && complaint.attachments.length > 0 
-          ? complaint.attachments.map(att => ({
-              url: getAttachmentUrl(att.path),
-              filename: att.filename || 'image',
-              uploadedAt: att.uploadedAt
-            }))
-          : []
+        attachments: await formatAttachments(complaint.attachments)
       };
-    });
+    }));
     
     res.json(formattedComplaints);
   } catch (err) {
@@ -278,8 +304,8 @@ exports.getAssignedComplaints = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50);
 
-    // Format response for DeptHead
-    const formattedComplaints = complaints.map(complaint => {
+    // Format response for DeptHead with async attachment URLs
+    const formattedComplaints = await Promise.all(complaints.map(async (complaint) => {
       // Check if location is valid (not [0,0])
       const hasValidLocation = complaint.location && 
                                complaint.location.coordinates && 
@@ -287,7 +313,6 @@ exports.getAssignedComplaints = async (req, res) => {
                                complaint.location.coordinates[0] !== 0 && 
                                complaint.location.coordinates[1] !== 0;
       
-   
       const lastActivity = complaint.history && complaint.history.length > 0 
         ? complaint.history[complaint.history.length - 1]
         : null;
@@ -323,26 +348,20 @@ exports.getAssignedComplaints = async (req, res) => {
         } : null,
         
         // Attachments with proper URLs
-        attachments: complaint.attachments && complaint.attachments.length > 0 
-          ? complaint.attachments.map(att => ({
-              url: getAttachmentUrl(att.path),
-              filename: att.filename || 'image',
-              uploadedAt: att.uploadedAt
-            }))
-          : [],
+        attachments: await formatAttachments(complaint.attachments),
         
         // Last activity summary 
         lastActivity: lastActivity ? {
           action: lastActivity.action,
           timestamp: lastActivity.timestamp,
           comment: lastActivity.comment || null,
-          by: lastActivity.by 
+          by: lastActivity.by
         } : null,
         
         isSpam: complaint.isSpam,  
         isDuplicate: !!complaint.duplicateOf
       };
-    });
+    }));
     
     res.json(formattedComplaints);
   } catch (err) {
@@ -447,16 +466,10 @@ exports.getComplaintsByOrganization = async (req, res) => {
       .sort({ createdAt: -1 });
 
     // Format attachments with proper URLs
-    const formattedComplaints = complaints.map(complaint => ({
+    const formattedComplaints = await Promise.all(complaints.map(async (complaint) => ({
       ...complaint.toObject(),
-      attachments: complaint.attachments && complaint.attachments.length > 0 
-        ? complaint.attachments.map(att => ({
-            url: getAttachmentUrl(att.path),
-            filename: att.filename || 'image',
-            uploadedAt: att.uploadedAt
-          }))
-        : []
-    }));
+      attachments: await formatAttachments(complaint.attachments)
+    })));
 
     res.json(formattedComplaints);
   } catch (err) {
