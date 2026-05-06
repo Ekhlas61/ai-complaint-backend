@@ -5,19 +5,27 @@ const crypto = require('crypto');
 const { sendEmail, generateOTP } = require('../utils/email');
 const AuditLog = require('../models/AuditLog');
 
-// Helper function for audit logging (only for admin roles)
+// Helper function for audit logging (only for SysAdmin and OrgAdmin)
 const createAdminAuditLog = async (req, action, targetType, targetId, description, status = 'SUCCESS', errorMessage = null) => {
-  // Only log if user exists and has admin role
-  const adminRoles = ['SysAdmin', 'OrgAdmin', 'OrgHead', 'DeptHead'];
-  const userRole = req.user?.role || req.body?.role;
+  // Only log for SysAdmin and OrgAdmin
+  const adminRoles = ['SysAdmin', 'OrgAdmin'];
+  const userRole = req.user?.role;
   
-  if (!adminRoles.includes(userRole) && action !== 'LOGIN') {
-    return; 
+   if (!userRole || !adminRoles.includes(userRole)) {
+    return;
   }
   
+  // Get IP address 
+  const ipAddress = req.ip || 
+                    req.connection?.remoteAddress || 
+                    req.socket?.remoteAddress || 
+                    req.headers['x-forwarded-for']?.split(',')[0] || 
+                    'unknown';
+  
   try {
+    
     await AuditLog.create({
-      user: req.user?._id || targetId,
+      user: req.user._id,
       action,
       description,
       targetType,
@@ -25,9 +33,10 @@ const createAdminAuditLog = async (req, action, targetType, targetId, descriptio
       orgId: req.user?.organization || null,
       status,
       errorMessage,
-      ip: req.ip,
-      adminRole: req.user?.role || (action === 'LOGIN' ? userRole : null),
+      ip: ipAddress,
+      adminRole: req.user.role,
     });
+    
   } catch (err) {
     console.error('Audit log creation failed:', err);
   }
@@ -99,7 +108,7 @@ exports.loginUser = async (req, res) => {
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash || ''))) {
       // Log failed login attempt for admin roles
-      const adminRoles = ['SysAdmin', 'OrgAdmin', 'OrgHead', 'DeptHead'];
+      const adminRoles = ['SysAdmin', 'OrgAdmin'];
       const userCheck = await User.findOne({ email });
       if (userCheck && adminRoles.includes(userCheck.role)) {
         await createAdminAuditLog(
@@ -123,7 +132,7 @@ exports.loginUser = async (req, res) => {
     await user.save();
 
     // Audit log - SUCCESS (only for admin roles)
-    const adminRoles = ['SysAdmin', 'OrgAdmin', 'OrgHead', 'DeptHead'];
+    const adminRoles = ['SysAdmin', 'OrgAdmin'];
     if (adminRoles.includes(user.role)) {
       await createAdminAuditLog(
         { ...req, user },
@@ -443,8 +452,8 @@ exports.changePassword = async (req, res) => {
 // Logout - WITH AUDIT FOR ADMIN ROLES
 exports.logout = async (req, res) => {
   try {
-    //  Audit log for admin logout
-    const adminRoles = ['SysAdmin', 'OrgAdmin', 'OrgHead', 'DeptHead'];
+    // Audit log for admin logout
+    const adminRoles = ['SysAdmin', 'OrgAdmin'];
     if (req.user && adminRoles.includes(req.user.role)) {
       await createAdminAuditLog(
         req,

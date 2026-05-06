@@ -33,13 +33,6 @@ const auditLogSchema = new mongoose.Schema(
         'DEPARTMENT_UPDATE',
         'DEPARTMENT_DEACTIVATE',
         
-        // Permission Changes
-        'PERMISSION_GRANTED',
-        'PERMISSION_REVOKED',
-        
-        // System Configuration
-        'SYSTEM_CONFIG_UPDATE',
-        'AI_CONFIG_UPDATE',
       ],
       index: true,
     },
@@ -60,16 +53,6 @@ const auditLogSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       required: true,
       index: true,
-    },
-
-    oldValue: {
-      type: mongoose.Schema.Types.Mixed,
-      default: null,
-    },
-    
-    newValue: {
-      type: mongoose.Schema.Types.Mixed,
-      default: null,
     },
 
     orgId: {
@@ -102,12 +85,13 @@ const auditLogSchema = new mongoose.Schema(
     // Track which admin role performed the action
     adminRole: {
       type: String,
-      enum: ['SysAdmin', 'OrgAdmin', 'OrgHead', 'DeptHead'],
+      enum: ['SysAdmin', 'OrgAdmin'],
       required: true,
     },
   },
   {
     timestamps: true,
+    versionKey: false,
   }
 );
 

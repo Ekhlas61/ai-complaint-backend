@@ -26,6 +26,7 @@ const aiRoutes = require('./src/routes/aiRoutes');
 const auditLogRoutes = require('./src/routes/auditLogRoutes');
 
 const app = express();
+app.set('trust proxy', true);
 
 const allowedOrigins = [
   process.env.FRONTEND_URL,

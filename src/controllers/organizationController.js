@@ -4,6 +4,13 @@ const AuditLog = require('../models/AuditLog');
 // Helper function for audit logging
 const createAuditLog = async (req, action, targetType, targetId, description, status = 'SUCCESS', errorMessage = null) => {
   try {
+    
+      const ipAddress = req.ip || 
+                      req.connection?.remoteAddress || 
+                      req.socket?.remoteAddress || 
+                      req.headers['x-forwarded-for']?.split(',')[0] || 
+                      'unknown';
+    
     await AuditLog.create({
       user: req.user._id,
       action,
@@ -13,7 +20,7 @@ const createAuditLog = async (req, action, targetType, targetId, description, st
       orgId: targetId, 
       status,
       errorMessage,
-      ip: req.ip,
+      ip: ipAddress,
       adminRole: req.user.role, 
     });
   } catch (err) {
