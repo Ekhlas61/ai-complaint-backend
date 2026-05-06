@@ -3,6 +3,35 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const crypto = require('crypto');
 const { sendEmail, generateOTP } = require('../utils/email');
+const AuditLog = require('../models/AuditLog');
+
+// Helper function for audit logging (only for admin roles)
+const createAdminAuditLog = async (req, action, targetType, targetId, description, status = 'SUCCESS', errorMessage = null) => {
+  // Only log if user exists and has admin role
+  const adminRoles = ['SysAdmin', 'OrgAdmin', 'OrgHead', 'DeptHead'];
+  const userRole = req.user?.role || req.body?.role;
+  
+  if (!adminRoles.includes(userRole) && action !== 'LOGIN') {
+    return; 
+  }
+  
+  try {
+    await AuditLog.create({
+      user: req.user?._id || targetId,
+      action,
+      description,
+      targetType,
+      targetId,
+      orgId: req.user?.organization || null,
+      status,
+      errorMessage,
+      ip: req.ip,
+      adminRole: req.user?.role || (action === 'LOGIN' ? userRole : null),
+    });
+  } catch (err) {
+    console.error('Audit log creation failed:', err);
+  }
+};
 
 // 🔑 Generate Token
 const generateToken = (user) => {
@@ -18,7 +47,7 @@ const generateToken = (user) => {
   );
 };
 
-// 📝 Register User - only citizens can self register 
+// 📝 Register User - only citizens can self register (NO AUDIT NEEDED)
 exports.registerUser = async (req, res) => {
   try {
     const { fullName, email, password } = req.body;
@@ -27,17 +56,14 @@ exports.registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Full name, email, and password are required' });
     }
 
-    // Check existing user
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'Email already in use' });
     }
 
-    // Hash password
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // Force role = Citizen
     const user = await User.create({
       fullName,
       email,
@@ -60,7 +86,7 @@ exports.registerUser = async (req, res) => {
   }
 };
 
-// 🔐 Login User
+// 🔐 Login User - WITH AUDIT FOR ADMIN ROLES ONLY
 exports.loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -72,6 +98,20 @@ exports.loginUser = async (req, res) => {
     const user = await User.findOne({ email }).select('+passwordHash');
 
     if (!user || !(await bcrypt.compare(password, user.passwordHash || ''))) {
+      // Log failed login attempt for admin roles
+      const adminRoles = ['SysAdmin', 'OrgAdmin', 'OrgHead', 'DeptHead'];
+      const userCheck = await User.findOne({ email });
+      if (userCheck && adminRoles.includes(userCheck.role)) {
+        await createAdminAuditLog(
+          { ip: req.ip, user: null },
+          'LOGIN',
+          'User',
+          userCheck._id,
+          `Failed login attempt for ${userCheck.role}: ${email}`,
+          'FAILURE',
+          'Invalid email or password'
+        );
+      }
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -79,9 +119,21 @@ exports.loginUser = async (req, res) => {
       return res.status(403).json({ message: 'Account is deactivated' });
     }
 
-    
     user.lastLogin = new Date();
     await user.save();
+
+    // Audit log - SUCCESS (only for admin roles)
+    const adminRoles = ['SysAdmin', 'OrgAdmin', 'OrgHead', 'DeptHead'];
+    if (adminRoles.includes(user.role)) {
+      await createAdminAuditLog(
+        { ...req, user },
+        'LOGIN',
+        'User',
+        user._id,
+        `${user.role} logged in successfully`,
+        'SUCCESS'
+      );
+    }
 
     const token = generateToken(user);
 
@@ -97,7 +149,7 @@ exports.loginUser = async (req, res) => {
   }
 };
 
-// Forgot Password - Request reset 
+// Forgot Password - Request reset (NO AUDIT NEEDED - not a sysadmin concern)
 exports.forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
@@ -114,10 +166,8 @@ exports.forgotPassword = async (req, res) => {
       });
     }
 
-    // Generate token
     const resetToken = crypto.randomBytes(32).toString('hex');
 
-    // Log the token for testing 
     console.log(`RESET TOKEN FOR ${email}: ${resetToken}`);
 
     user.resetPasswordToken = crypto
@@ -125,11 +175,10 @@ exports.forgotPassword = async (req, res) => {
       .update(resetToken)
       .digest('hex');
 
-    user.resetPasswordExpire = Date.now() + 60 * 60 * 1000; 
+    user.resetPasswordExpire = Date.now() + 60 * 60 * 1000;
 
     await user.save();
 
-    // Create reset URL (Dynamic: checks body first, then Origin header, then ENV fallback)
     const frontend = req.body.clientUrl || req.headers.origin || process.env.FRONTEND_URL || 'http://localhost:3000';
     const resetUrl = `${frontend}/reset-password?token=${resetToken}&email=${encodeURIComponent(email)}`;
 
@@ -150,7 +199,6 @@ exports.forgotPassword = async (req, res) => {
 
       console.log('sendResult from sendEmail:', sendResult);
 
-      // If sendEmail returned an error object, surface it for debugging
       if (sendResult && sendResult.error) {
         console.error('Email send failed:', sendResult);
         user.resetPasswordToken = null;
@@ -162,7 +210,6 @@ exports.forgotPassword = async (req, res) => {
         });
       }
 
-      // If using Ethereal or test account, include previewUrl to help local testing
       if (sendResult && sendResult.previewUrl) {
         return res.status(200).json({
           message: 'A reset link has been sent (preview available).',
@@ -170,7 +217,6 @@ exports.forgotPassword = async (req, res) => {
         });
       }
 
-      // For real email services, return success message
       return res.status(200).json({ message: 'A reset link has been sent to your email.' });
     } catch (emailErr) {
       console.error('Email send error:', emailErr);
@@ -186,7 +232,7 @@ exports.forgotPassword = async (req, res) => {
   }
 };
 
-// Forgot Password with OTP - Send OTP to email
+// Forgot Password with OTP - Send OTP to email (NO AUDIT NEEDED)
 exports.forgotPasswordOTP = async (req, res) => {
   try {
     const { email } = req.body;
@@ -203,12 +249,10 @@ exports.forgotPasswordOTP = async (req, res) => {
       });
     }
 
-    // Generate OTP
     const otp = generateOTP();
     
-    // Store OTP with expiration (15 minutes)
     user.resetPasswordOTP = otp;
-    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000;
     
     await user.save();
 
@@ -264,7 +308,7 @@ exports.forgotPasswordOTP = async (req, res) => {
   }
 };
 
-// Reset Password with OTP
+// Reset Password with OTP (NO AUDIT NEEDED - password reset is personal)
 exports.resetPasswordWithOTP = async (req, res) => {
   try {
     const { email, otp, password } = req.body;
@@ -283,11 +327,9 @@ exports.resetPasswordWithOTP = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired OTP' });
     }
 
-    // Hash new password
     const salt = await bcrypt.genSalt(10);
     user.passwordHash = await bcrypt.hash(password, salt);
 
-    // Clear OTP fields
     user.resetPasswordOTP = null;
     user.resetPasswordExpire = null;
 
@@ -300,7 +342,7 @@ exports.resetPasswordWithOTP = async (req, res) => {
   }
 };
 
-// Reset Password - Set new password 
+// Reset Password - Set new password (NO AUDIT NEEDED)
 exports.resetPassword = async (req, res) => {
   try {
     const { token, email, password } = req.body;
@@ -309,7 +351,6 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Token, email, and password are required' });
     }
 
-    // Hash the incoming token to compare
     const hashedToken = crypto
       .createHash('sha256')
       .update(token)
@@ -325,11 +366,9 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ message: 'Invalid or expired token' });
     }
 
-    // Hash new password
     const salt = await bcrypt.genSalt(10);
     user.passwordHash = await bcrypt.hash(password, salt);
 
-    // Clear reset fields
     user.resetPasswordToken = null;
     user.resetPasswordExpire = null;
 
@@ -342,10 +381,9 @@ exports.resetPassword = async (req, res) => {
   }
 };
 
-// Get current user's profile
+// Get current user's profile (NO AUDIT NEEDED)
 exports.getProfile = async (req, res) => {
   try {
-    // req.user is already attached by protect middleware
     const user = await User.findById(req.user._id).select(
       '-passwordHash -resetPasswordToken -resetPasswordExpire -__v'
     );
@@ -369,7 +407,7 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-// Change password (unchanged)
+// Change password (NO AUDIT NEEDED - personal action)
 exports.changePassword = async (req, res) => {
   try {
     const { oldPassword, newPassword } = req.body;
@@ -384,14 +422,12 @@ exports.changePassword = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Check old password
     const isMatch = await bcrypt.compare(oldPassword, user.passwordHash);
 
     if (!isMatch) {
       return res.status(401).json({ message: 'Current password is incorrect' });
     }
 
-    // Hash and save new password
     const salt = await bcrypt.genSalt(10);
     user.passwordHash = await bcrypt.hash(newPassword, salt);
 
@@ -403,14 +439,31 @@ exports.changePassword = async (req, res) => {
     return res.status(500).json({ message: 'Server error' });
   }
 };
-// ...log out...
-exports.logout = (req, res) => {
-  res.clearCookie('token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-  });
-  res.status(200).json({ message: 'Logged out successfully' });
-};
-// ...log out ...
 
+// Logout - WITH AUDIT FOR ADMIN ROLES
+exports.logout = async (req, res) => {
+  try {
+    //  Audit log for admin logout
+    const adminRoles = ['SysAdmin', 'OrgAdmin', 'OrgHead', 'DeptHead'];
+    if (req.user && adminRoles.includes(req.user.role)) {
+      await createAdminAuditLog(
+        req,
+        'LOGOUT',
+        'User',
+        req.user._id,
+        `${req.user.role} logged out`,
+        'SUCCESS'
+      );
+    }
+    
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    });
+    res.status(200).json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Logout error:', error);
+    res.status(500).json({ message: 'Server error during logout' });
+  }
+};

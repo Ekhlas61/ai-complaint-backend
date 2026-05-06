@@ -2,8 +2,29 @@ const User = require('../models/User');
 const Department = require('../models/Department');
 const Organization = require('../models/Organization');
 const bcrypt = require('bcryptjs');
+const AuditLog = require('../models/AuditLog');
 
-// Check for existing active OrgAdmin 
+// Helper function for audit logging
+const createAuditLog = async (req, action, targetType, targetId, description, status = 'SUCCESS', errorMessage = null) => {
+  try {
+    await AuditLog.create({
+      user: req.user._id,
+      action,
+      description,
+      targetType,
+      targetId,
+      orgId: req.user.organization || (targetType === 'Organization' ? targetId : null),
+      status,
+      errorMessage,
+      ip: req.ip,
+      adminRole: req.user.role,
+    });
+  } catch (err) {
+    console.error('Audit log creation failed:', err);
+  }
+};
+
+// Helper functions for existence checks (unchanged)
 async function hasActiveOrgAdmin(organizationId, excludeUserId = null) {
   const query = { role: 'OrgAdmin', organization: organizationId, isActive: true };
   if (excludeUserId) query._id = { $ne: excludeUserId };
@@ -11,7 +32,6 @@ async function hasActiveOrgAdmin(organizationId, excludeUserId = null) {
   return !!existing;
 }
 
-// Check for existing active OrgHead
 async function hasActiveOrgHead(organizationId, excludeUserId = null) {
   const query = { role: 'OrgHead', organization: organizationId, isActive: true };
   if (excludeUserId) query._id = { $ne: excludeUserId };
@@ -19,7 +39,6 @@ async function hasActiveOrgHead(organizationId, excludeUserId = null) {
   return !!existing;
 }
 
-// Check for existing active DeptHead
 async function hasActiveDeptHead(departmentId, excludeUserId = null) {
   const query = { role: 'DeptHead', department: departmentId, isActive: true };
   if (excludeUserId) query._id = { $ne: excludeUserId };
@@ -39,7 +58,6 @@ exports.createOrgAdmin = async (req, res) => {
       return res.status(400).json({ message: 'Invalid organization ID' });
     }
 
-    // Check if an active OrgAdmin already exists for this organization
     const hasActive = await hasActiveOrgAdmin(organizationId);
     if (hasActive) {
       return res.status(400).json({ message: 'This organization already has an active OrgAdmin. Deactivate the existing one first.' });
@@ -59,6 +77,17 @@ exports.createOrgAdmin = async (req, res) => {
       organization: organization._id,
       isActive: true,
     });
+
+    // Audit log - SUCCESS
+    await createAuditLog(
+      req,
+      'USER_CREATE',
+      'User',
+      user._id,
+      `Created OrgAdmin "${fullName}" (${email}) for organization ${organization.name}`,
+      'SUCCESS'
+    );
+
     res.status(201).json({
       _id: user._id,
       fullName: user.fullName,
@@ -67,11 +96,21 @@ exports.createOrgAdmin = async (req, res) => {
       organization: organization.name,
     });
   } catch (err) {
+    // Audit log - FAILURE
+    await createAuditLog(
+      req,
+      'USER_CREATE',
+      'User',
+      null,
+      `Failed to create OrgAdmin: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
     res.status(500).json({ message: err.message });
   }
 };
 
-// Get all OrgAdmins (SysAdmin only)
+// Get all OrgAdmins (SysAdmin only) - NO AUDIT LOG NEEDED (GET request)
 exports.getOrgAdmins = async (req, res) => {
   try {
     const orgAdmins = await User.find({ role: 'OrgAdmin', isActive: true })
@@ -95,20 +134,38 @@ exports.updateOrgAdmin = async (req, res) => {
       return res.status(400).json({ message: 'User is not an OrgAdmin' });
     }
 
+    const changes = [];
+    if (fullName && fullName !== user.fullName) changes.push(`name from "${user.fullName}" to "${fullName}"`);
+    if (email && email !== user.email) changes.push(`email from "${user.email}" to "${email}"`);
+
     if (isActive !== undefined && isActive === true && !user.isActive) {
       const hasActive = await hasActiveOrgAdmin(user.organization, user._id);
       if (hasActive) {
         return res.status(400).json({ message: 'Cannot reactivate: Another active OrgAdmin already exists for this organization.' });
       }
       user.isActive = true;
+      changes.push(`reactivated account`);
     } else if (isActive !== undefined && isActive === false && user.isActive) {
       user.isActive = false;
+      changes.push(`deactivated account`);
     }
 
     if (fullName) user.fullName = fullName;
     if (email) user.email = email;
 
     await user.save();
+
+    if (changes.length > 0) {
+      // Audit log - SUCCESS
+      await createAuditLog(
+        req,
+        'USER_UPDATE',
+        'User',
+        user._id,
+        `Updated OrgAdmin ${user.fullName}: ${changes.join(', ')}`,
+        'SUCCESS'
+      );
+    }
 
     res.json({
       _id: user._id,
@@ -119,6 +176,16 @@ exports.updateOrgAdmin = async (req, res) => {
       isActive: user.isActive,
     });
   } catch (err) {
+    // Audit log - FAILURE
+    await createAuditLog(
+      req,
+      'USER_UPDATE',
+      'User',
+      req.params.id,
+      `Failed to update OrgAdmin: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
     res.status(500).json({ message: err.message });
   }
 };
@@ -137,8 +204,28 @@ exports.deactivateOrgAdmin = async (req, res) => {
     user.isActive = false;
     await user.save();
 
+    // Audit log
+    await createAuditLog(
+      req,
+      'USER_DEACTIVATE',
+      'User',
+      user._id,
+      `Deactivated OrgAdmin ${user.fullName} (${user.email})`,
+      'SUCCESS'
+    );
+
     res.json({ message: 'OrgAdmin deactivated successfully', user: { _id: user._id, fullName: user.fullName, email: user.email, isActive: false } });
   } catch (err) {
+    // Audit log - FAILURE
+    await createAuditLog(
+      req,
+      'USER_DEACTIVATE',
+      'User',
+      req.params.id,
+      `Failed to deactivate OrgAdmin: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
     res.status(500).json({ message: err.message });
   }
 };
@@ -155,7 +242,6 @@ exports.createOrgHead = async (req, res) => {
       return res.status(400).json({ message: 'Invalid organization ID' });
     }
 
-    // Check if an active OrgHead already exists for this organization
     const hasActive = await hasActiveOrgHead(organizationId);
     if (hasActive) {
       return res.status(400).json({ message: 'This organization already has an active OrgHead. Deactivate the existing one first.' });
@@ -176,8 +262,17 @@ exports.createOrgHead = async (req, res) => {
       isActive: true,
     });
 
-    // Set organization head to this OrgHead
     await Organization.findByIdAndUpdate(organizationId, { head: user._id });
+
+    // Audit log
+    await createAuditLog(
+      req,
+      'USER_CREATE',
+      'User',
+      user._id,
+      `Created OrgHead "${fullName}" (${email}) for organization ${organization.name}`,
+      'SUCCESS'
+    );
 
     res.status(201).json({
       _id: user._id,
@@ -187,11 +282,21 @@ exports.createOrgHead = async (req, res) => {
       organization: organization.name,
     });
   } catch (err) {
+    // Audit log - FAILURE
+    await createAuditLog(
+      req,
+      'USER_CREATE',
+      'User',
+      null,
+      `Failed to create OrgHead: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
     res.status(500).json({ message: err.message });
   }
 };
 
-// Get all OrgHeads (SysAdmin only)
+// Get all OrgHeads (SysAdmin only) - NO AUDIT LOG NEEDED
 exports.getOrgHeads = async (req, res) => {
   try {
     const orgHeads = await User.find({ role: 'OrgHead', isActive: true })
@@ -215,21 +320,25 @@ exports.updateOrgHead = async (req, res) => {
       return res.status(400).json({ message: 'User is not an OrgHead' });
     }
 
-    // If changing organization
+    const changes = [];
+    if (fullName && fullName !== user.fullName) changes.push(`name from "${user.fullName}" to "${fullName}"`);
+    if (email && email !== user.email) changes.push(`email from "${user.email}" to "${email}"`);
+
     if (organizationId && organizationId !== user.organization?.toString()) {
       const newOrg = await Organization.findById(organizationId);
       if (!newOrg) return res.status(400).json({ message: 'Organization not found' });
 
-      // Check if target organization already has an active OrgHead
       const hasActive = await hasActiveOrgHead(organizationId, user._id);
       if (hasActive) {
         return res.status(400).json({ message: 'The target organization already has an active OrgHead.' });
       }
 
-      // Remove as head from old organization
       if (user.organization) {
         await Organization.findByIdAndUpdate(user.organization, { head: null });
       }
+
+      const oldOrgName = user.organization ? (await Organization.findById(user.organization)).name : 'None';
+      changes.push(`organization from "${oldOrgName}" to "${newOrg.name}"`);
 
       user.organization = newOrg._id;
       await Organization.findByIdAndUpdate(newOrg._id, { head: user._id });
@@ -245,11 +354,13 @@ exports.updateOrgHead = async (req, res) => {
           return res.status(400).json({ message: 'Cannot reactivate: Another active OrgHead already exists for this organization.' });
         }
         user.isActive = true;
+        changes.push('reactivated account');
         if (user.organization) {
           await Organization.findByIdAndUpdate(user.organization, { head: user._id });
         }
       } else if (isActive === false && user.isActive) {
         user.isActive = false;
+        changes.push('deactivated account');
         if (user.organization) {
           await Organization.findByIdAndUpdate(user.organization, { head: null });
         }
@@ -257,6 +368,17 @@ exports.updateOrgHead = async (req, res) => {
     }
 
     await user.save();
+
+    if (changes.length > 0) {
+      await createAuditLog(
+        req,
+        'USER_UPDATE',
+        'User',
+        user._id,
+        `Updated OrgHead ${user.fullName}: ${changes.join(', ')}`,
+        'SUCCESS'
+      );
+    }
 
     res.json({
       _id: user._id,
@@ -267,6 +389,15 @@ exports.updateOrgHead = async (req, res) => {
       isActive: user.isActive,
     });
   } catch (err) {
+    await createAuditLog(
+      req,
+      'USER_UPDATE',
+      'User',
+      req.params.id,
+      `Failed to update OrgHead: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
     res.status(500).json({ message: err.message });
   }
 };
@@ -285,13 +416,30 @@ exports.deactivateOrgHead = async (req, res) => {
     user.isActive = false;
     await user.save();
 
-    // Remove this user as head of organization
     if (user.organization) {
       await Organization.findByIdAndUpdate(user.organization, { head: null });
     }
 
+    await createAuditLog(
+      req,
+      'USER_DEACTIVATE',
+      'User',
+      user._id,
+      `Deactivated OrgHead ${user.fullName} (${user.email})`,
+      'SUCCESS'
+    );
+
     res.json({ message: 'OrgHead deactivated successfully', user: { _id: user._id, fullName: user.fullName, email: user.email, isActive: false } });
   } catch (err) {
+    await createAuditLog(
+      req,
+      'USER_DEACTIVATE',
+      'User',
+      req.params.id,
+      `Failed to deactivate OrgHead: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
     res.status(500).json({ message: err.message });
   }
 };
@@ -310,7 +458,6 @@ exports.createDeptHead = async (req, res) => {
       return res.status(403).json({ message: 'You can only create DeptHead for your own organization' });
     }
 
-    // Check if an active DeptHead already exists for this department
     const hasActive = await hasActiveDeptHead(departmentId);
     if (hasActive) {
       return res.status(400).json({ message: 'This department already has an active DeptHead. Deactivate the existing one first.' });
@@ -332,8 +479,16 @@ exports.createDeptHead = async (req, res) => {
       isActive: true,
     });
 
-    // Set department head to this DeptHead
     await Department.findByIdAndUpdate(departmentId, { head: user._id });
+
+    await createAuditLog(
+      req,
+      'USER_CREATE',
+      'User',
+      user._id,
+      `Created DeptHead "${fullName}" (${email}) for department ${department.name}`,
+      'SUCCESS'
+    );
 
     res.status(201).json({
       _id: user._id,
@@ -344,14 +499,22 @@ exports.createDeptHead = async (req, res) => {
       organization: (await Organization.findById(req.user.organization)).name,
     });
   } catch (err) {
+    await createAuditLog(
+      req,
+      'USER_CREATE',
+      'User',
+      null,
+      `Failed to create DeptHead: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
     res.status(500).json({ message: err.message });
   }
 };
 
-// Get all DeptHeads in the OrgAdmin's organization
+// Get all DeptHeads - NO AUDIT LOG NEEDED (GET request)
 exports.getDeptHeads = async (req, res) => {
   try {
-    
     let organizationId;
     
     if (req.user.role === 'OrgAdmin') {
@@ -380,7 +543,7 @@ exports.getDeptHeads = async (req, res) => {
   }
 };
 
-// Update DeptHead (OrgAdmin only, must be in same organization)
+// Update DeptHead (OrgAdmin only)
 exports.updateDeptHead = async (req, res) => {
   try {
     const { id } = req.params;
@@ -395,7 +558,10 @@ exports.updateDeptHead = async (req, res) => {
       return res.status(403).json({ message: 'You can only update DeptHeads in your own organization' });
     }
 
-    // If changing department
+    const changes = [];
+    if (fullName && fullName !== user.fullName) changes.push(`name from "${user.fullName}" to "${fullName}"`);
+    if (email && email !== user.email) changes.push(`email from "${user.email}" to "${email}"`);
+
     if (departmentId && departmentId !== user.department?.toString()) {
       const newDept = await Department.findById(departmentId);
       if (!newDept) return res.status(400).json({ message: 'Department not found' });
@@ -403,14 +569,14 @@ exports.updateDeptHead = async (req, res) => {
         return res.status(403).json({ message: 'Department must belong to your organization' });
       }
 
-      // Check if target department already has an active DeptHead 
       const hasActive = await hasActiveDeptHead(departmentId, user._id);
       if (hasActive) {
         return res.status(400).json({ message: 'The target department already has an active DeptHead. Deactivate that head first.' });
       }
 
-      // Remove head from old department if the user was head
       if (user.department) {
+        const oldDept = await Department.findById(user.department);
+        changes.push(`department from "${oldDept.name}" to "${newDept.name}"`);
         await Department.findByIdAndUpdate(user.department, { head: null });
       }
 
@@ -421,7 +587,6 @@ exports.updateDeptHead = async (req, res) => {
     if (fullName) user.fullName = fullName;
     if (email) user.email = email;
 
-    // If toggling active status
     if (isActive !== undefined) {
       if (isActive === true && !user.isActive) {
         const hasActive = await hasActiveDeptHead(user.department, user._id);
@@ -429,11 +594,13 @@ exports.updateDeptHead = async (req, res) => {
           return res.status(400).json({ message: 'Cannot reactivate: Another active DeptHead already exists for this department.' });
         }
         user.isActive = true;
+        changes.push('reactivated account');
         if (user.department) {
           await Department.findByIdAndUpdate(user.department, { head: user._id });
         }
       } else if (isActive === false && user.isActive) {
         user.isActive = false;
+        changes.push('deactivated account');
         if (user.department) {
           await Department.findByIdAndUpdate(user.department, { head: null });
         }
@@ -441,6 +608,17 @@ exports.updateDeptHead = async (req, res) => {
     }
 
     await user.save();
+
+    if (changes.length > 0) {
+      await createAuditLog(
+        req,
+        'USER_UPDATE',
+        'User',
+        user._id,
+        `Updated DeptHead ${user.fullName}: ${changes.join(', ')}`,
+        'SUCCESS'
+      );
+    }
 
     res.json({
       _id: user._id,
@@ -452,6 +630,15 @@ exports.updateDeptHead = async (req, res) => {
       isActive: user.isActive,
     });
   } catch (err) {
+    await createAuditLog(
+      req,
+      'USER_UPDATE',
+      'User',
+      req.params.id,
+      `Failed to update DeptHead: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
     res.status(500).json({ message: err.message });
   }
 };
@@ -473,13 +660,30 @@ exports.deactivateDeptHead = async (req, res) => {
     user.isActive = false;
     await user.save();
 
-    // Remove this user as head of department
     if (user.department) {
       await Department.findByIdAndUpdate(user.department, { head: null });
     }
 
+    await createAuditLog(
+      req,
+      'USER_DEACTIVATE',
+      'User',
+      user._id,
+      `Deactivated DeptHead ${user.fullName} (${user.email})`,
+      'SUCCESS'
+    );
+
     res.json({ message: 'DeptHead deactivated successfully', user: { _id: user._id, fullName: user.fullName, email: user.email, isActive: false } });
   } catch (err) {
+    await createAuditLog(
+      req,
+      'USER_DEACTIVATE',
+      'User',
+      req.params.id,
+      `Failed to deactivate DeptHead: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
     res.status(500).json({ message: err.message });
   }
 };

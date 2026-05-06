@@ -2,6 +2,26 @@ const Department = require('../models/Department');
 const AuditLog = require('../models/AuditLog');
 const mongoose = require('mongoose');
 
+// Helper function for audit logging
+const createAuditLog = async (req, action, targetType, targetId, description, status = 'SUCCESS', errorMessage = null) => {
+  try {
+    await AuditLog.create({
+      user: req.user._id,
+      action,
+      description,
+      targetType,
+      targetId,
+      orgId: req.user.organization,  
+      status,
+      errorMessage,
+      ip: req.ip,
+      adminRole: req.user.role,  
+    });
+  } catch (err) {
+    console.error('Audit log creation failed:', err);
+  }
+};
+
 // ────────────────────────────────────────────────
 // OrgAdmin: Create department
 // ────────────────────────────────────────────────
@@ -19,7 +39,6 @@ exports.createDepartment = async (req, res) => {
       return res.status(403).json({ message: 'Your account is not associated with an organization' });
     }
 
-   
     const existing = await Department.findOne({ $or: [{ name }, { code }] });
     if (existing) {
       return res.status(400).json({ message: 'Name or code already in use' });
@@ -29,22 +48,34 @@ exports.createDepartment = async (req, res) => {
       name,
       code: code.toUpperCase().trim(),
       description,
-      organization: req.user.organization,   
+      organization: req.user.organization,
     });
 
-    // Audit log
-    await AuditLog.create({
-      user: req.user._id,
-      action: 'DEPARTMENT_CREATE',
-      description: `Created department "${name}" (code: ${code})`,
-      targetType: 'Department',
-      targetId: department._id,
-      ip: req.ip,
-    });
+    
+    await createAuditLog(
+      req,
+      'DEPARTMENT_CREATE',
+      'Department',
+      department._id,
+      `Created department "${name}" (code: ${code})`,
+      'SUCCESS'
+    );
 
     res.status(201).json(department);
   } catch (err) {
     console.error(err);
+    
+    
+    await createAuditLog(
+      req,
+      'DEPARTMENT_CREATE',
+      'Department',
+      null,
+      `Failed to create department: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
+    
     res.status(500).json({ message: err.message || 'Server error' });
   }
 };
@@ -89,25 +120,52 @@ exports.updateDepartment = async (req, res) => {
       return res.status(403).json({ message: 'You can only update departments of your own organization' });
     }
 
-    // Only allow certain fields
-    if (updates.name) department.name = updates.name.trim();
-    if (updates.code) department.code = updates.code.toUpperCase().trim();
-    if (updates.description !== undefined) department.description = updates.description?.trim() || '';
-  
+    // Track changes for description
+    const changes = [];
+    if (updates.name && updates.name.trim() !== department.name) {
+      changes.push(`name from "${department.name}" to "${updates.name.trim()}"`);
+      department.name = updates.name.trim();
+    }
+    if (updates.code && updates.code.toUpperCase().trim() !== department.code) {
+      changes.push(`code from "${department.code}" to "${updates.code.toUpperCase().trim()}"`);
+      department.code = updates.code.toUpperCase().trim();
+    }
+    if (updates.description !== undefined && updates.description?.trim() !== department.description) {
+      changes.push('description updated');
+      department.description = updates.description?.trim() || '';
+    }
+
+    if (changes.length === 0) {
+      return res.status(400).json({ message: 'No changes detected' });
+    }
 
     await department.save();
 
-    await AuditLog.create({
-      user: req.user._id,
-      action: 'DEPARTMENT_UPDATE',
-      description: `Updated department ${department.name} (${department.code})`,
-      targetType: 'Department',
-      targetId: department._id,
-      ip: req.ip,
-    });
+    
+    await createAuditLog(
+      req,
+      'DEPARTMENT_UPDATE',
+      'Department',
+      department._id,
+      `Updated department ${department.name}: ${changes.join(', ')}`,
+      'SUCCESS'
+    );
 
     res.json(department);
   } catch (err) {
+    console.error(err);
+    
+  
+    await createAuditLog(
+      req,
+      'DEPARTMENT_UPDATE',
+      'Department',
+      req.params.id,
+      `Failed to update department: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
+    
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -136,17 +194,31 @@ exports.deactivateDepartment = async (req, res) => {
     department.isActive = false;
     await department.save();
 
-    await AuditLog.create({
-      user: req.user._id,
-      action: 'DEPARTMENT_DEACTIVATE',
-      description: `Deactivated department ${department.name} (${department.code})`,
-      targetType: 'Department',
-      targetId: department._id,
-      ip: req.ip,
-    });
+    
+    await createAuditLog(
+      req,
+      'DEPARTMENT_DEACTIVATE',
+      'Department',
+      department._id,
+      `Deactivated department ${department.name} (${department.code})`,
+      'SUCCESS'
+    );
 
     res.json({ message: 'Department deactivated', department });
   } catch (err) {
+    console.error(err);
+    
+    
+    await createAuditLog(
+      req,
+      'DEPARTMENT_DEACTIVATE',
+      'Department',
+      req.params.id,
+      `Failed to deactivate department: ${err.message}`,
+      'FAILURE',
+      err.message
+    );
+    
     res.status(500).json({ message: 'Server error' });
   }
 };

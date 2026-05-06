@@ -23,6 +23,7 @@ const organizationRoutes = require('./src/routes/organizationRoutes');
 const notificationRoutes = require('./src/routes/notificationRoutes');
 const uploadRoutes = require('./src/routes/uploadRoutes');
 const aiRoutes = require('./src/routes/aiRoutes');
+const auditLogRoutes = require('./src/routes/auditLogRoutes');
 
 const app = express();
 
@@ -130,6 +131,7 @@ app.use('/api/organizations', organizationRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 
 // Test route
 app.get('/', (req, res) => {

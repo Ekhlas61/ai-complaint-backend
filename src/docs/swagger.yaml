@@ -224,6 +224,60 @@ components:
         resolvedPercentage:
           type: integer
 
+    AuditLog:
+      type: object
+      properties:
+        _id:
+          type: string
+        user:
+          type: object
+          properties:
+            _id:
+              type: string
+            fullName:
+              type: string
+            email:
+              type: string
+            role:
+              type: string
+        action:
+          type: string
+        description:
+          type: string
+        targetType:
+          type: string
+        targetId:
+          type: string
+        oldValue:
+          type: object
+          nullable: true
+        newValue:
+          type: object
+          nullable: true
+        orgId:
+          type: object
+          nullable: true
+          properties:
+            _id:
+              type: string
+            name:
+              type: string
+            code:
+              type: string
+        status:
+          type: string
+        errorMessage:
+          type: string
+          nullable: true
+        ip:
+          type: string
+          nullable: true
+        adminRole:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
   responses:
     Unauthorized:
       description: Unauthorized
@@ -1111,3 +1165,37 @@ paths:
       responses:
         '200':
           description: Organization admin analytics retrieved successfully
+
+      # ========== AUDIT LOGS ==========
+  /audit-logs/activities:
+    get:
+      summary: Get admin activities (SysAdmin only)
+      tags: [Audit Logs]
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Admin activities retrieved successfully
+        '403':
+          description: Access denied. SysAdmin only.
+
+  /audit-logs/summary:
+    get:
+      summary: Get admin activity summary (SysAdmin only)
+      tags: [Audit Logs]
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Admin summary retrieved successfully
+        '403':
+          description: Access denied. SysAdmin only.
