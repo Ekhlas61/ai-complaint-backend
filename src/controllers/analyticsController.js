@@ -2,168 +2,137 @@ const Complaint = require('../models/Complaint');
 const Department = require('../models/Department');
 const User = require('../models/User');
 const Organization = require('../models/Organization');
-
-// ========== HELPER FUNCTIONS ==========
-
-// Get counts and percentage for a query filter
-const getStats = async (filter) => {
-  const total = await Complaint.countDocuments(filter);
-  const resolved = await Complaint.countDocuments({ ...filter, status: 'Resolved' });
-  const pending = total - resolved;
-  const resolvedPercentage = total === 0 ? 0 : Math.round((resolved / total) * 100);
-  return { total, resolved, pending, resolvedPercentage };
-};
-
-// Calculate average resolution time in hours
-const calculateAvgResolutionTime = (complaints) => {
-  if (!complaints || complaints.length === 0) return 0;
-  const totalHours = complaints.reduce((sum, complaint) => {
-    if (complaint.resolvedAt && complaint.createdAt) {
-      const hours = (complaint.resolvedAt - complaint.createdAt) / (1000 * 60 * 60);
-      return sum + hours;
-    }
-    return sum;
-  }, 0);
-  return Math.round(totalHours / complaints.length);
-};
-
-// Get average resolution time for a department
-const getDeptAvgResolutionTime = async (deptId) => {
-  const resolved = await Complaint.find({
-    department: deptId,
-    status: 'Resolved',
-    resolvedAt: { $exists: true }
-  }).select('createdAt resolvedAt');
-  return calculateAvgResolutionTime(resolved);
-};
-
-// Get department head workload (complaints per head)
-const getDeptHeadWorkload = async (deptId) => {
-  const headCount = await User.countDocuments({ 
-    role: 'DeptHead', 
-    department: deptId,
-    isActive: true 
-  });
-  if (headCount === 0) return 0;
-  const complaintCount = await Complaint.countDocuments({ department: deptId });
-  return Math.round(complaintCount / headCount);
-};
-
-// Get monthly complaint trends
-const getMonthlyTrends = async (filter = {}) => {
-  const months = [];
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date();
-    date.setMonth(date.getMonth() - i);
-    const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-    
-    const count = await Complaint.countDocuments({
-      ...filter,
-      createdAt: { $gte: startOfMonth, $lte: endOfMonth }
-    });
-    
-    months.push({
-      month: startOfMonth.toLocaleString('default', { month: 'short' }),
-      year: startOfMonth.getFullYear(),
-      count
-    });
-  }
-  return months;
-};
-
-// Calculate performance score (0-100)
-const calculatePerformanceScore = (resolutionRate, avgTimeHours) => {
-  const timeScore = Math.min(100, Math.max(0, 100 - (avgTimeHours / 24)));
-  return Math.round((resolutionRate * 0.7) + (timeScore * 0.3));
-};
-
-// Get stale complaints (older than X days, not resolved)
-const getStaleComplaintsCount = async (days = 30, filter = {}) => {
-  const staleDate = new Date();
-  staleDate.setDate(staleDate.getDate() - days);
-  return await Complaint.countDocuments({
-    ...filter,
-    status: { $ne: 'Resolved' },
-    createdAt: { $lt: staleDate }
-  });
-};
-
-// Get inactive department heads
-const getInactiveDeptHeads = async (days = 30, filter = {}) => {
-  const inactiveDate = new Date();
-  inactiveDate.setDate(inactiveDate.getDate() - days);
-  return await User.countDocuments({
-    role: 'DeptHead',
-    isActive: true,
-    ...filter,
-    lastLogin: { $lt: inactiveDate }
-  });
-};
-
-// Generate SysAdmin recommendations
-const generateSysAdminRecommendations = (organizations, avgResolutionTime, staleComplaints) => {
-  const recommendations = [];
-  
-  const strugglingOrgs = organizations.filter(org => org.resolvedPercentage < 60);
-  if (strugglingOrgs.length > 0) {
-    recommendations.push({
-      type: 'INTERVENTION',
-      priority: 'high',
-      message: `${strugglingOrgs.length} organization(s) have resolution rate below 60%`,
-      organizations: strugglingOrgs.map(org => org.name),
-      suggestedAction: 'Schedule performance review meetings with organization heads'
-    });
-  }
-  
-  const highStaleOrgs = organizations.filter(org => org.staleComplaints > 30);
-  if (highStaleOrgs.length > 0) {
-    recommendations.push({
-      type: 'BACKLOG_CLEARANCE',
-      priority: 'high',
-      message: `${highStaleOrgs.length} organization(s) have significant backlog (>30 stale complaints)`,
-      organizations: highStaleOrgs.map(org => org.name),
-      suggestedAction: 'Escalate and request backlog clearance plan'
-    });
-  }
-  
-  if (avgResolutionTime > 96) {
-    recommendations.push({
-      type: 'PLATFORM_OPTIMIZATION',
-      priority: 'medium',
-      message: `Average resolution time is ${avgResolutionTime} hours, exceeding target of 72 hours`,
-      suggestedAction: 'Review platform workflow efficiency and consider automation opportunities'
-    });
-  }
-  
-  if (staleComplaints > 200) {
-    recommendations.push({
-      type: 'SYSTEM_HEALTH',
-      priority: 'critical',
-      message: `${staleComplaints} stale complaints platform-wide indicates systemic issue`,
-      suggestedAction: 'Conduct platform-wide audit and implement SLA monitoring'
-    });
-  }
-  
-  return recommendations;
-};
+const {
+  getStats,
+  calculateAvgResolutionTime,
+  getDeptAvgResolutionTime,
+  getDeptHeadWorkload,
+  getMonthlyTrends,
+  getCurrentMonthStats,
+  getPreviousMonthStats,
+  getStaleComplaintsCount,
+  getInactiveDeptHeads,
+  calculatePerformanceScore,
+  calculateSLACompliance,
+  getResolutionTimeByPriority,
+  generateSysAdminRecommendations,
+  calculateSystemHealthScore
+} = require('../utils/analyticsHelper');
 
 // ========== CONTROLLER FUNCTIONS ==========
 
+// Helper for org average resolution time 
+const calculateAvgResolutionTimeForOrg = async (orgId) => {
+  const departments = await Department.find({ organization: orgId }).select('_id');
+  const deptIds = departments.map(d => d._id);
+  
+  const resolvedComplaints = await Complaint.find({
+    department: { $in: deptIds },
+    status: 'Resolved',
+    resolvedAt: { $exists: true }
+  }).select('createdAt resolvedAt');
+  
+  return calculateAvgResolutionTime(resolvedComplaints);
+};
+
+
+ // Department Head Analytics with Monthly Trends & SLA
+ 
 const getDeptHeadStats = async (req, res) => {
   try {
     const departmentId = req.user.department;
     if (!departmentId) {
       return res.status(400).json({ message: 'DeptHead not associated with any department' });
     }
-    const stats = await getStats({ department: departmentId });
-    res.json(stats);
+
+    const deptFilter = { department: departmentId };
+    
+    // 1. Current month trends
+    const currentMonth = await getCurrentMonthStats(Complaint, deptFilter);
+    const previousMonth = await getPreviousMonthStats(Complaint, deptFilter);
+    
+    // Calculate month-over-month change
+    const monthOverMonthChange = previousMonth.total === 0 
+      ? 100 
+      : Math.round(((currentMonth.total - previousMonth.total) / previousMonth.total) * 100);
+    
+    // 2. Overall stats (all time)
+    const overallStats = await getStats(Complaint, deptFilter);
+    
+    // 3. SLA Compliance for resolved complaints
+    const allResolvedComplaints = await Complaint.find({
+      ...deptFilter,
+      status: 'Resolved',
+      resolvedAt: { $exists: true }
+    }).select('createdAt resolvedAt priority status');
+    
+    const slaCompliance = calculateSLACompliance(allResolvedComplaints);
+    
+    // 4. Resolution time by priority
+    const resolutionTimeByPriority = await getResolutionTimeByPriority(Complaint, deptFilter);
+    
+    // 5. Pending complaints breakdown by priority
+    const pendingByPriority = await Complaint.aggregate([
+      { $match: { department: departmentId, status: { $ne: 'Resolved' } } },
+      { $group: { _id: { $ifNull: ['$priority', 'Medium'] }, count: { $sum: 1 } } }
+    ]);
+    
+    const pendingBreakdown = {
+      Critical: 0,
+      High: 0,
+      Medium: 0,
+      Low: 0
+    };
+    pendingByPriority.forEach(item => {
+      pendingBreakdown[item._id] = item.count;
+    });
+    
+    // 6. Last 6 months trends (for chart)
+    const monthlyTrends = await getMonthlyTrends(Complaint, deptFilter);
+    
+    res.json({
+      currentMonth: {
+        ...currentMonth,
+        comparisonToPreviousMonth: {
+          percentageChange: monthOverMonthChange,
+          previousMonthTotal: previousMonth.total,
+          previousMonthResolutionRate: previousMonth.resolutionRate
+        }
+      },
+      overall: overallStats,
+      sla: {
+        overallComplianceRate: slaCompliance.overall,
+        totalResolvedComplaints: slaCompliance.totalResolvedComplaints,
+        slaCompliantCount: slaCompliance.slaCompliantCount,
+        byPriority: slaCompliance.byPriority
+      },
+      performance: {
+        averageResolutionTimeByPriority: resolutionTimeByPriority,
+        pendingComplaintsByPriority: pendingBreakdown,
+        totalPending: overallStats.pending
+      },
+      trends: {
+        last6Months: monthlyTrends
+      },
+      summary: {
+        receivedThisMonth: currentMonth.total,
+        resolvedThisMonth: currentMonth.resolved,
+        pendingThisMonth: currentMonth.pending,
+        resolutionRateThisMonth: currentMonth.resolutionRate,
+        slaComplianceRate: slaCompliance.overall
+      }
+    });
+    
   } catch (err) {
-    console.error(err);
+    console.error('DeptHead stats error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
+ // Organization Head Stats
+
+
+ 
 const getOrgHeadStats = async (req, res) => {
   try {
     const orgId = req.user.organization;
@@ -181,12 +150,68 @@ const getOrgHeadStats = async (req, res) => {
     const deptStats = [];
     
     for (const dept of departments) {
-      const stats = await getStats({ department: dept._id });
-      const avgResolutionTime = await getDeptAvgResolutionTime(dept._id);
+      const stats = await getStats(Complaint, { department: dept._id });
+      const avgResolutionTime = await getDeptAvgResolutionTime(Complaint, dept._id);
       const complaintsLast30Days = await Complaint.countDocuments({
         department: dept._id,
         createdAt: { $gte: new Date(Date.now() - 30*24*60*60*1000) }
       });
+      
+      // Get SLA compliance for this department
+      const deptResolvedComplaints = await Complaint.find({
+        department: dept._id,
+        status: 'Resolved',
+        resolvedAt: { $exists: true }
+      }).select('createdAt resolvedAt priority status');
+      
+      const slaCompliance = calculateSLACompliance(deptResolvedComplaints);
+      
+      // Get pending complaints by priority (to identify bottlenecks)
+      const pendingByPriority = await Complaint.aggregate([
+        { 
+          $match: { 
+            department: dept._id, 
+            status: { $ne: 'Resolved' } 
+          } 
+        },
+        { 
+          $group: { 
+            _id: { $ifNull: ['$priority', 'Medium'] }, 
+            count: { $sum: 1 },
+            oldestCreatedAt: { $min: '$createdAt' }
+          } 
+        }
+      ]);
+      
+      const pendingBreakdown = {
+        Critical: { count: 0, oldestDays: null },
+        High: { count: 0, oldestDays: null },
+        Medium: { count: 0, oldestDays: null },
+        Low: { count: 0, oldestDays: null }
+      };
+      
+      pendingByPriority.forEach(item => {
+        const daysPending = Math.floor((Date.now() - new Date(item.oldestCreatedAt)) / (1000 * 60 * 60 * 24));
+        pendingBreakdown[item._id] = {
+          count: item.count,
+          oldestDays: daysPending
+        };
+      });
+      
+      // Determine SLA status for this department
+      let slaStatus = 'Good';
+      let slaMessage = '';
+      
+      if (slaCompliance.byPriority.Critical.percentage < 90 && slaCompliance.byPriority.Critical.total > 0) {
+        slaStatus = 'Critical';
+        slaMessage = `Critical priority SLA failing (${slaCompliance.byPriority.Critical.percentage}% compliance)`;
+      } else if (slaCompliance.byPriority.High.percentage < 85 && slaCompliance.byPriority.High.total > 0) {
+        slaStatus = 'Warning';
+        slaMessage = `High priority SLA below target (${slaCompliance.byPriority.High.percentage}% compliance)`;
+      } else if (slaCompliance.overall < 75 && stats.total > 10) {
+        slaStatus = 'Attention';
+        slaMessage = `Overall SLA compliance below 75%`;
+      }
       
       deptStats.push({ 
         departmentId: dept._id, 
@@ -195,6 +220,14 @@ const getOrgHeadStats = async (req, res) => {
         avgResolutionTimeHours: avgResolutionTime,
         newComplaintsLast30Days: complaintsLast30Days,
         performanceScore: calculatePerformanceScore(stats.resolvedPercentage, avgResolutionTime),
+        sla: {
+          overallCompliance: slaCompliance.overall,
+          byPriority: slaCompliance.byPriority,
+          status: slaStatus,
+          message: slaMessage
+        },
+        pendingBreakdown,
+        needsAttention: slaStatus !== 'Good'
       });
       
       overall.total += stats.total;
@@ -203,24 +236,56 @@ const getOrgHeadStats = async (req, res) => {
     }
     overall.resolvedPercentage = overall.total === 0 ? 0 : Math.round((overall.resolved / overall.total) * 100);
 
-    const staleComplaints = await getStaleComplaintsCount(30, { department: { $in: departments.map(d => d._id) } });
-    const monthlyTrends = await getMonthlyTrends({ department: { $in: departments.map(d => d._id) } });
+    const staleComplaints = await getStaleComplaintsCount(Complaint, 30, { department: { $in: departments.map(d => d._id) } });
+    const monthlyTrends = await getMonthlyTrends(Complaint, { department: { $in: departments.map(d => d._id) } });
     
-    // Problem departments (only those with complaints AND poor performance)
+    // Problem departments based on SLA (updated logic)
     const problemDepartments = deptStats
-      .filter(d => d.total > 0 && (d.resolvedPercentage < 50 || d.avgResolutionTimeHours > 168))
+      .filter(d => d.total > 0 && (
+        d.sla.overallCompliance < 70 || 
+        d.sla.byPriority.Critical.percentage < 90 ||
+        d.sla.byPriority.High.percentage < 85 ||
+        d.pendingBreakdown.Critical.count > 5 ||
+        d.avgResolutionTimeHours > 168
+      ))
       .map(d => ({ 
         name: d.name, 
         resolvedPercentage: d.resolvedPercentage, 
         avgTime: d.avgResolutionTimeHours,
-        pending: d.pending
+        pending: d.pending,
+        slaCompliance: d.sla.overallCompliance,
+        criticalSLACompliance: d.sla.byPriority.Critical.percentage,
+        highSLACompliance: d.sla.byPriority.High.percentage,
+        criticalPending: d.pendingBreakdown.Critical.count
       }));
     
-    // Top performers (only those with complaints)
+    // Top performers (based on SLA compliance + resolution rate)
     const topDepartments = [...deptStats]
       .filter(d => d.total > 0)
-      .sort((a, b) => (b.performanceScore || 0) - (a.performanceScore || 0))
+      .sort((a, b) => {
+        // Sort by SLA compliance first, then resolution rate
+        if (a.sla.overallCompliance !== b.sla.overallCompliance) {
+          return b.sla.overallCompliance - a.sla.overallCompliance;
+        }
+        return (b.performanceScore || 0) - (a.performanceScore || 0);
+      })
       .slice(0, 3);
+    
+    // SLA Summary across organization
+    const slaSummary = {
+      overallCompliance: deptStats.length === 0 ? 0 : 
+        Math.round(deptStats.reduce((sum, d) => sum + d.sla.overallCompliance, 0) / deptStats.length),
+      criticalCompliance: deptStats.length === 0 ? 0 :
+        Math.round(deptStats.reduce((sum, d) => sum + d.sla.byPriority.Critical.percentage, 0) / deptStats.length),
+      highCompliance: deptStats.length === 0 ? 0 :
+        Math.round(deptStats.reduce((sum, d) => sum + d.sla.byPriority.High.percentage, 0) / deptStats.length),
+      mediumCompliance: deptStats.length === 0 ? 0 :
+        Math.round(deptStats.reduce((sum, d) => sum + d.sla.byPriority.Medium.percentage, 0) / deptStats.length),
+      lowCompliance: deptStats.length === 0 ? 0 :
+        Math.round(deptStats.reduce((sum, d) => sum + d.sla.byPriority.Low.percentage, 0) / deptStats.length),
+      departmentsAtRisk: deptStats.filter(d => d.sla.overallCompliance < 70).length,
+      departmentsWithCriticalBacklog: deptStats.filter(d => d.pendingBreakdown.Critical.count > 3).length
+    };
     
     const summary = {
       totalDepartments: departments.length,
@@ -229,19 +294,60 @@ const getOrgHeadStats = async (req, res) => {
       pendingComplaints: overall.pending,
       overallResolutionRate: overall.resolvedPercentage,
       staleComplaints,
-      avgResolutionTimeHours: await calculateAvgResolutionTimeForOrg(orgId) || 0 
+      avgResolutionTimeHours: await calculateAvgResolutionTimeForOrg(orgId) || 0,
+      slaSummary
     };
     
-    // Complaint-focused recommendations
+    // Enhanced recommendations with SLA focus
     const recommendations = [];
+    
+    // Departments failing Critical SLA
+    const criticalSLAFailure = deptStats.filter(d => 
+      d.sla.byPriority.Critical.percentage < 90 && d.sla.byPriority.Critical.total > 0
+    );
+    if (criticalSLAFailure.length > 0) {
+      recommendations.push({
+        type: 'CRITICAL_SLA_VIOLATION',
+        priority: 'critical',
+        message: `${criticalSLAFailure.length} department(s) failing Critical priority SLA (target: 90% within 24 hours)`,
+        departments: criticalSLAFailure.map(d => d.name),
+        suggestedAction: 'Immediate review of critical complaint handling process and resource allocation'
+      });
+    }
+    
+    // Departments with high priority SLA issues
+    const highSLAFailure = deptStats.filter(d => 
+      d.sla.byPriority.High.percentage < 85 && d.sla.byPriority.High.total > 0
+    );
+    if (highSLAFailure.length > 0) {
+      recommendations.push({
+        type: 'HIGH_PRIORITY_SLA_ISSUE',
+        priority: 'high',
+        message: `${highSLAFailure.length} department(s) failing High priority SLA (target: 85% within 48 hours)`,
+        departments: highSLAFailure.map(d => d.name),
+        suggestedAction: 'Review high priority complaint workflows and escalate bottlenecks'
+      });
+    }
+    
+    // Critical complaints pending too long
+    const criticalBacklog = deptStats.filter(d => d.pendingBreakdown.Critical.count > 3);
+    if (criticalBacklog.length > 0) {
+      recommendations.push({
+        type: 'CRITICAL_BACKLOG',
+        priority: 'critical',
+        message: `${criticalBacklog.length} department(s) have ${criticalBacklog.reduce((sum, d) => sum + d.pendingBreakdown.Critical.count, 0)} unresolved critical complaints`,
+        departments: criticalBacklog.map(d => `${d.name} (${d.pendingBreakdown.Critical.count} pending)`),
+        suggestedAction: 'Form tiger team to clear critical complaint backlog immediately'
+      });
+    }
     
     if (problemDepartments.length > 0) {
       recommendations.push({
         type: 'PERFORMANCE_INTERVENTION',
         priority: 'high',
-        message: `${problemDepartments.length} department(s) have low resolution rates or slow response times`,
+        message: `${problemDepartments.length} department(s) have low SLA compliance or resolution rates`,
         departments: problemDepartments.map(d => d.name),
-        suggestedAction: 'Review department workflows and provide additional training'
+        suggestedAction: 'Schedule SLA performance review meetings with department heads'
       });
     }
     
@@ -254,14 +360,9 @@ const getOrgHeadStats = async (req, res) => {
       });
     }
     
-    if (overall.resolvedPercentage < 50 && overall.total > 10) {
-      recommendations.push({
-        type: 'PROCESS_AUDIT',
-        priority: 'medium',
-        message: `Overall resolution rate is ${overall.resolvedPercentage}% below target`,
-        suggestedAction: 'Conduct end-to-end process audit and identify bottlenecks'
-      });
-    }
+    const needsAttention = problemDepartments.length > 0 || 
+                          criticalSLAFailure.length > 0 || 
+                          criticalBacklog.length > 0;
     
     res.json({ 
       summary, 
@@ -270,7 +371,13 @@ const getOrgHeadStats = async (req, res) => {
         problemDepartments,
         topPerformers: topDepartments,
         monthlyTrends,
-        needsAttention: problemDepartments.length > 0
+        needsAttention,
+        slaHealth: {
+          status: slaSummary.overallCompliance >= 85 ? 'Healthy' : 
+                  slaSummary.overallCompliance >= 70 ? 'Moderate' : 'Critical',
+          departmentsAtRisk: slaSummary.departmentsAtRisk,
+          criticalBacklogCount: slaSummary.departmentsWithCriticalBacklog
+        }
       },
       recommendations
     });
@@ -280,26 +387,16 @@ const getOrgHeadStats = async (req, res) => {
   }
 };
 
-// Helper for org average resolution time
-const calculateAvgResolutionTimeForOrg = async (orgId) => {
-  const departments = await Department.find({ organization: orgId }).select('_id');
-  const deptIds = departments.map(d => d._id);
-  
-  const resolvedComplaints = await Complaint.find({
-    department: { $in: deptIds },
-    status: 'Resolved',
-    resolvedAt: { $exists: true }
-  }).select('createdAt resolvedAt');
-  
-  return calculateAvgResolutionTime(resolvedComplaints);
-};
+
+ // System Admin Stats
+
 const getSysAdminStats = async (req, res) => {
   try {
     // Get all active organizations
     const organizations = await Organization.find({ isActive: true }).select('_id name createdAt');
     
     // Overall stats across all complaints
-    const overallStats = await getStats({});
+    const overallStats = await getStats(Complaint, {});
     
     // Platform-wide metrics
     const resolvedComplaints = await Complaint.find({
@@ -308,13 +405,13 @@ const getSysAdminStats = async (req, res) => {
     }).select('createdAt resolvedAt');
     
     const avgResolutionTime = calculateAvgResolutionTime(resolvedComplaints);
-    const staleComplaints = await getStaleComplaintsCount(30);
-    const inactiveHeads = await getInactiveDeptHeads(30);
-    const monthlyTrends = await getMonthlyTrends();
+    const staleComplaints = await getStaleComplaintsCount(Complaint, 30);
+    const inactiveHeads = await getInactiveDeptHeads(User, 30);
+    const monthlyTrends = await getMonthlyTrends(Complaint);
     
     // Per organization detailed stats
     const orgDetailedStats = await Promise.all(organizations.map(async (org) => {
-      const stats = await getStats({ organization: org._id });
+      const stats = await getStats(Complaint, { organization: org._id });
       
       const orgResolvedComplaints = await Complaint.find({
         organization: org._id,
@@ -323,8 +420,8 @@ const getSysAdminStats = async (req, res) => {
       }).select('createdAt resolvedAt');
       
       const avgTime = calculateAvgResolutionTime(orgResolvedComplaints);
-      const staleCount = await getStaleComplaintsCount(30, { organization: org._id });
-      const inactiveOrgHeads = await getInactiveDeptHeads(30, { organization: org._id });
+      const staleCount = await getStaleComplaintsCount(Complaint, 30, { organization: org._id });
+      const inactiveOrgHeads = await getInactiveDeptHeads(User, 30, { organization: org._id });
       
       return {
         organizationId: org._id,
@@ -404,6 +501,8 @@ const getSysAdminStats = async (req, res) => {
   }
 };
 
+ // Organization Admin Stats
+ 
 const getOrgAdminStats = async (req, res) => {
   try {
     const orgId = req.user.organization;
@@ -584,24 +683,11 @@ const getOrgAdminStats = async (req, res) => {
   }
 };
 
-// Helper function for system health score
-const calculateSystemHealthScore = (totalDepts, deptsWithHeads, activeHeads, totalHeads) => {
-  let score = 100;
-  
-  // Deduct for missing heads (30% weight)
-  const missingHeadsRate = totalDepts === 0 ? 0 : ((totalDepts - deptsWithHeads) / totalDepts) * 100;
-  score -= missingHeadsRate * 0.3;
-  
-  // Deduct for inactive heads (20% weight)
-  const inactiveRate = totalHeads === 0 ? 0 : ((totalHeads - activeHeads) / totalHeads) * 100;
-  score -= inactiveRate * 0.2;
-  
-  return Math.max(0, Math.round(score));
-};
-
+// Citizen Stats
+ 
 const getCitizenStats = async (req, res) => {
   try {
-    const stats = await getStats({ submittedBy: req.user._id });
+    const stats = await getStats(Complaint, { submittedBy: req.user._id });
     res.json(stats);
   } catch (err) {
     res.status(500).json({ message: err.message });
