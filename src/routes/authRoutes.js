@@ -11,6 +11,7 @@ const {
   forgotPasswordOTP,
   resetPasswordWithOTP,
   getProfile,
+  updateCitizenProfile,
   changePassword,
   logout
 } = require('../controllers/authController');
@@ -26,6 +27,7 @@ router.post('/reset-password-otp', resetPasswordWithOTP);
 
 // ========== PROTECTED ROUTES (Authentication required) ==========
 router.get('/profile', protect, getProfile);
+router.put('/profile', protect, updateCitizenProfile);
 router.post('/change-password', protect, changePassword);
 router.post('/logout', protect, logout);
 

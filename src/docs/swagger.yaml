@@ -382,6 +382,29 @@ paths:
         '200':
           description: User profile
 
+    put:
+      summary: Update citizen profile name
+      tags: [Authentication]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [fullName]
+              properties:
+                fullName:
+                  type: string
+      responses:
+        '200':
+          description: Profile updated successfully
+        '403':
+          description: Access denied. Only citizens can update their profile.
+        '400':
+          description: Full name is required
+
   /auth/change-password:
     post:
       summary: Change password

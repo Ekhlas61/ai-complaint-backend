@@ -490,6 +490,55 @@ exports.getProfile = async (req, res) => {
 };
 
 /**
+ * Update Citizen Profile - Only for citizens to update their full name
+ */
+exports.updateCitizenProfile = async (req, res) => {
+  try {
+    // Check if user is a citizen
+    if (req.user.role !== 'Citizen') {
+      return res.status(403).json({ 
+        message: 'Access denied. Only citizens can update their profile.' 
+      });
+    }
+
+    const { fullName } = req.body;
+
+    if (!fullName || fullName.trim() === '') {
+      return res.status(400).json({ 
+        message: 'Full name is required and cannot be empty' 
+      });
+    }
+
+    // Update the user's full name 
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { fullName: fullName.trim() },
+      { new: true, runValidators: true }
+    ).select('-passwordHash -resetPasswordToken -resetPasswordExpire -__v -refreshTokens');
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    return res.status(200).json({
+      message: 'Profile updated successfully',
+      user: {
+        userId: updatedUser._id,
+        fullName: updatedUser.fullName,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        createdAt: updatedUser.createdAt,
+        lastLogin: updatedUser.lastLogin,
+        isActive: updatedUser.isActive,
+      }
+    });
+  } catch (error) {
+    console.error('Update citizen profile error:', error);
+    return res.status(500).json({ message: 'Server error while updating profile' });
+  }
+};
+
+/**
  * Change password
  */
 exports.changePassword = async (req, res) => {
