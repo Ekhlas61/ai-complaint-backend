@@ -15,7 +15,11 @@ yarn-error.log*
 # OS files
 .DS_Store
 Thumbs.db
-
+EMAIL_CONFIGURATION_FIX.md
+RENDER_ENV_SETUP.sh
+EMAIL_FIX_ACTION_PLAN.md
+EMAIL_FIX_CHANGES.md
+EMAIL_ISSUE_DIAGNOSIS.md
 # Build / output
 dist/
 build/
