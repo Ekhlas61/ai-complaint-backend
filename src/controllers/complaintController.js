@@ -447,18 +447,55 @@ exports.getComplaintsByOrganization = async (req, res) => {
       return res.status(400).json({ message: 'User not associated with any organization' });
     }
 
+    // Fetch complaints
     const complaints = await Complaint.find({ organization: organizationId })
       .populate('submittedBy', 'fullName email')
       .populate('department', 'name code')
-      .populate('assignedTo', 'fullName') 
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
-    // Format attachments with proper URLs
-    const formattedComplaints = await Promise.all(complaints.map(async (complaint) => ({
-      ...complaint.toObject(),
-      attachments: await formatAttachments(complaint.attachments)
-    })));
+    // Get department heads
+    const departmentIds = complaints
+      .map(c => c.department?._id)
+      .filter(id => id)
+      .map(id => id.toString());
+    
+    const uniqueDeptIds = [...new Set(departmentIds)];
+    
+    const departmentHeads = await User.find({
+      department: { $in: uniqueDeptIds },
+      role: 'DeptHead',
+      isActive: true
+    }).lean();
 
+    const headMap = {};
+    departmentHeads.forEach(head => {
+      if (head.department) {
+        headMap[head.department.toString()] = {
+          _id: head._id,
+          fullName: head.fullName,
+          email: head.email
+        };
+      }
+    });
+
+    // Format complaints
+    const formattedComplaints = [];
+    for (const complaint of complaints) {
+      // Remove __v
+      delete complaint.__v;
+      
+      // Add assignedTo from department head
+      const deptId = complaint.department?._id?.toString();
+      complaint.assignedTo = deptId && headMap[deptId] ? headMap[deptId] : null;
+      
+      // Format attachments
+      complaint.attachments = await formatAttachments(complaint.attachments || []);
+      
+      formattedComplaints.push(complaint);
+    }
+
+    // Return just the array - consistent with your other endpoints
     res.json(formattedComplaints);
   } catch (err) {
     console.error(err);
