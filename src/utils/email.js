@@ -1,7 +1,42 @@
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 
 const sendEmail = async ({ to, subject, html }) => {
-  // If SMTP credentials are provided, use them. Otherwise create an Ethereal test account
+  // Try Resend API first (works on cloud platforms that block SMTP)
+  if (process.env.RESEND_API_KEY) {
+    try {
+      console.log(`Attempting to send email via Resend API to ${to}`);
+      const response = await axios.post(
+        'https://api.resend.com/emails',
+        {
+          from: process.env.EMAIL_FROM || '"Complaint System" <onboarding@resend.dev>',
+          to: [to],
+          subject,
+          html,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 30000,
+        }
+      );
+
+      console.log(`Email sent successfully via Resend to ${to}, messageId: ${response.data.id}`);
+      return { info: { messageId: response.data.id }, success: true, method: 'resend' };
+    } catch (err) {
+      console.error('Resend API email sending failed:', {
+        to,
+        error: err.message,
+        code: err.code,
+        response: err.response?.data,
+      });
+      // Continue to try SMTP as fallback
+    }
+  }
+
+  // Fallback to SMTP (will fail on platforms that block outbound SMTP)
   let transporter;
   let usingTestAccount = false;
 
@@ -9,22 +44,20 @@ const sendEmail = async ({ to, subject, html }) => {
     transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
       port: parseInt(process.env.EMAIL_PORT) || 587,
-      secure: parseInt(process.env.EMAIL_PORT) === 465, // true for port 465, false for others
+      secure: parseInt(process.env.EMAIL_PORT) === 465,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
-      // Force IPv4 and increase timeouts for production environments
-      family: 4, // Force IPv4
-      connectionTimeout: 30000, // 30 seconds
-      greetingTimeout: 15000, // 15 seconds
-      socketTimeout: 30000, // 30 seconds
+      family: 4,
+      connectionTimeout: 30000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
       tls: {
-        rejectUnauthorized: false, // Allow self-signed certificates if needed
+        rejectUnauthorized: false,
       },
     });
   } else {
-    // Create a disposable Ethereal account for testing when real SMTP is not configured
     try {
       const testAccount = await nodemailer.createTestAccount();
       transporter = nodemailer.createTransport({
@@ -35,7 +68,6 @@ const sendEmail = async ({ to, subject, html }) => {
           user: testAccount.user,
           pass: testAccount.pass,
         },
-        // Force IPv4 and increase timeouts
         family: 4,
         connectionTimeout: 30000,
         greetingTimeout: 15000,
@@ -55,21 +87,18 @@ const sendEmail = async ({ to, subject, html }) => {
   };
 
   try {
-    console.log(`Attempting to send email to ${to} via ${usingTestAccount ? 'Ethereal test account' : process.env.EMAIL_HOST || 'smtp.gmail.com'}`);
+    console.log(`Attempting to send email via SMTP to ${to}`);
     const info = await transporter.sendMail(mailOptions);
-    console.log(`Email sent successfully to ${to}, messageId: ${info.messageId}`);
+    console.log(`Email sent successfully via SMTP to ${to}, messageId: ${info.messageId}`);
 
-    // If using Ethereal (either test account or provided credentials), return the preview URL
     if (usingTestAccount || process.env.EMAIL_HOST?.includes('ethereal.email')) {
       const previewUrl = nodemailer.getTestMessageUrl(info);
-      return { info, previewUrl };
+      return { info, previewUrl, method: 'smtp' };
     }
 
-    // For real email services (Gmail), just return success info
-    return { info, success: true };
+    return { info, success: true, method: 'smtp' };
   } catch (err) {
-    // Log detailed error information for debugging
-    console.error('Email sending failed:', {
+    console.error('SMTP email sending failed:', {
       to,
       host: process.env.EMAIL_HOST || 'smtp.gmail.com',
       port: process.env.EMAIL_PORT || 587,
@@ -77,7 +106,6 @@ const sendEmail = async ({ to, subject, html }) => {
       code: err.code,
       stack: err.stack,
     });
-    // Return error details to caller so higher-level handlers can decide how to respond
     return { error: err.message, code: err.code, stack: err.stack };
   }
 };
