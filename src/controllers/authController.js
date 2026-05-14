@@ -296,7 +296,12 @@ exports.forgotPassword = async (req, res) => {
         user.resetPasswordToken = null;
         user.resetPasswordExpire = null;
         await user.save();
-        return res.status(500).json({ message: 'Email could not be sent', error: sendResult.error });
+        console.error('Forgot password email error:', sendResult.error);
+        return res.status(500).json({ 
+          message: 'Email could not be sent', 
+          error: sendResult.error,
+          code: sendResult.code || 'EMAIL_SEND_FAILED'
+        });
       }
 
       if (sendResult && sendResult.previewUrl) {
@@ -311,7 +316,12 @@ exports.forgotPassword = async (req, res) => {
       user.resetPasswordToken = null;
       user.resetPasswordExpire = null;
       await user.save();
-      return res.status(500).json({ message: 'Email could not be sent' });
+      console.error('Forgot password email exception:', emailErr);
+      return res.status(500).json({ 
+        message: 'Email could not be sent',
+        error: emailErr.message,
+        code: 'EMAIL_EXCEPTION'
+      });
     }
   } catch (error) {
     console.error('Forgot password error:', error);
@@ -364,7 +374,12 @@ exports.forgotPasswordOTP = async (req, res) => {
         user.resetPasswordOTP = null;
         user.resetPasswordExpire = null;
         await user.save();
-        return res.status(500).json({ message: 'OTP could not be sent', error: sendResult.error });
+        console.error('Forgot password OTP email error:', sendResult.error);
+        return res.status(500).json({ 
+          message: 'OTP could not be sent', 
+          error: sendResult.error,
+          code: sendResult.code || 'EMAIL_SEND_FAILED'
+        });
       }
 
       if (sendResult && sendResult.previewUrl) {
@@ -379,7 +394,12 @@ exports.forgotPasswordOTP = async (req, res) => {
       user.resetPasswordOTP = null;
       user.resetPasswordExpire = null;
       await user.save();
-      return res.status(500).json({ message: 'OTP could not be sent' });
+      console.error('Forgot password OTP email exception:', emailErr);
+      return res.status(500).json({ 
+        message: 'OTP could not be sent',
+        error: emailErr.message,
+        code: 'EMAIL_EXCEPTION'
+      });
     }
   } catch (error) {
     console.error('Forgot password OTP error:', error);
