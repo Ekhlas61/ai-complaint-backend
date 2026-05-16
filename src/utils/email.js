@@ -20,10 +20,14 @@ const sendEmail = async ({ to, subject, html }) => {
   if (process.env.RESEND_API_KEY) {
     try {
       console.log(`[EMAIL] Attempting to send via Resend API to ${to}`);
+      
+      // Use Resend's default sender if no custom domain is verified
+      const fromAddress = process.env.RESEND_FROM || 'onboarding@resend.dev';
+      
       const response = await axios.post(
         'https://api.resend.com/emails',
         {
-          from: process.env.EMAIL_FROM || '"Complaint System" <onboarding@resend.dev>',
+          from: fromAddress,
           to: [to],
           subject,
           html,
@@ -57,9 +61,14 @@ const sendEmail = async ({ to, subject, html }) => {
       // On production/Render, don't fallback to SMTP (will fail anyway)
       if (isProduction) {
         console.error('[EMAIL] Production environment - not falling back to SMTP');
+        const errorMessage = err.response?.status === 403 
+          ? 'Resend API authentication failed. Please check your RESEND_API_KEY and verify your domain in Resend dashboard.'
+          : `Resend API failed: ${err.message}`;
+        
         return { 
-          error: `Resend API failed: ${err.message}`,
+          error: errorMessage,
           code: err.code || 'RESEND_FAILED',
+          status: err.response?.status,
           details: err.response?.data,
         };
       }
